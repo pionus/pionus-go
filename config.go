@@ -1,25 +1,58 @@
 package main
 
 import (
-    "io/ioutil"
-    "encoding/json"
+	"fmt"
+	"os"
+
+	"gopkg.in/yaml.v3"
 )
 
-type config struct {
-    Addr string `json:"addr"`
-    Cert string `json:"cert"`
-    Key string `json:"key"`
-    Storage string `json:"storage"`
-    Authorization string `json:"authorization"`
-    Theme string `json:"theme"`
+type ServerConfig struct {
+	Addr string `yaml:"addr"`
 }
 
-func GetConfig() *config {
-    file, _ := ioutil.ReadFile("config.json")
-    var c config
-    json.Unmarshal(file, &c)
-    return &c
+type DatabaseConfig struct {
+	Path string `yaml:"path"`
 }
 
+type TLSConfig struct {
+	Cert string `yaml:"cert"`
+	Key  string `yaml:"key"`
+}
 
-var Config = GetConfig()
+type Config struct {
+	Server    ServerConfig   `yaml:"server"`
+	Theme     string         `yaml:"theme"`
+	Database  DatabaseConfig `yaml:"database"`
+	TLS       TLSConfig      `yaml:"tls"`
+	AuthToken string         `yaml:"-"`
+}
+
+func LoadConfig(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read config file: %w", err)
+	}
+
+	cfg := &Config{
+		Server:   ServerConfig{Addr: ":8087"},
+		Theme:    "default",
+		Database: DatabaseConfig{Path: "./data/pionus.db"},
+	}
+
+	if err := yaml.Unmarshal(data, cfg); err != nil {
+		return nil, fmt.Errorf("parse config file: %w", err)
+	}
+
+	if v := os.Getenv("PIONUS_AUTH_TOKEN"); v != "" {
+		cfg.AuthToken = v
+	}
+	if v := os.Getenv("PIONUS_ADDR"); v != "" {
+		cfg.Server.Addr = v
+	}
+	if v := os.Getenv("PIONUS_DB_PATH"); v != "" {
+		cfg.Database.Path = v
+	}
+
+	return cfg, nil
+}

@@ -1,21 +1,16 @@
-.PHONY: start
-
+.PHONY: dev build start stop restart migrate
 
 OUTFILE=pionus
 PIDFILE=pionus.pid
 
+dev:
+	go run .
 
-build_plugin:
-	go build -buildmode=plugin -o storages/file.so storages/file.go
-
-dev: build_plugin
-	go run *.go
-
-build: build_plugin
-	go build -o $(OUTFILE) *.go
+build:
+	go build -o $(OUTFILE) .
 
 stop:
-ifeq (,$(wildcard $PIDFILE))
+ifneq (,$(wildcard $(PIDFILE)))
 	kill -9 $$(cat $(PIDFILE))
 	rm -f $(PIDFILE)
 endif
@@ -23,5 +18,7 @@ endif
 start: build
 	./$(OUTFILE) & echo $$! > $(PIDFILE)
 
-restart: stop
-	./$(OUTFILE) & echo $$! > $(PIDFILE)
+restart: stop start
+
+migrate:
+	go run . -migrate

@@ -3,4 +3,8 @@
 *.key
 *.bak
 *.so
+*.db
 logs
+pionus
+.env
+data/

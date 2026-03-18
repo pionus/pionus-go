@@ -1,0 +1,11 @@
+server:
+  addr: ":8087"
+
+theme: default
+
+database:
+  path: "./data/pionus.db"
+
+tls:
+  cert: ""
+  key: ""
