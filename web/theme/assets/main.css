@@ -588,3 +588,9 @@ main.wrap { flex: 1 0 auto; padding-block: 44px 72px; }
   .timeline-day { font-size: 28px; }
   .friend-links { grid-template-columns: 1fr; }
 }
+
+.note-permalink {
+  display: inline-block; margin-top: 10px;
+  font-family: var(--mono); font-size: 11px; color: var(--faint);
+}
+.note-permalink:hover { color: var(--accent); text-decoration: none; }

@@ -9,6 +9,7 @@
 <meta name="author" content="{{.Site.Author}}">
 {{if .Site.Keywords}}<meta name="keywords" content="{{.Site.Keywords}}">{{end}}
 <link rel="canonical" href="{{.CanonicalURL}}">
+{{if .NoIndex}}<meta name="robots" content="noindex,follow">{{end}}
 <link rel="alternate" type="application/rss+xml" title="{{.Site.Title}}" href="/feed">
 <meta property="og:site_name" content="{{.Site.Title}}">
 <meta property="og:title" content="{{if .Post}}{{.Post.Title}}{{else}}{{.Title}}{{end}}">

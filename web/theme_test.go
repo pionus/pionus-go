@@ -134,7 +134,7 @@ func TestPostTemplate(t *testing.T) {
 func TestNotesTemplate(t *testing.T) {
 	data := siteData("微语")
 	data["Notes"] = []map[string]any{
-		{"HTML": template.HTML("<p>一条微语</p>"), "CreatedAt": time.Now()},
+		{"ID": 7, "HTML": template.HTML("<p>一条微语</p>"), "CreatedAt": time.Now()},
 	}
 	data["Total"] = 1
 	data["Page"] = 1
@@ -145,7 +145,7 @@ func TestNotesTemplate(t *testing.T) {
 	data["NextURL"] = ""
 
 	out := renderTemplate(t, "notes.html", data)
-	if !strings.Contains(out, "一条微语") || !strings.Contains(out, "timeline-item") {
+	if !strings.Contains(out, "一条微语") || !strings.Contains(out, "timeline-item") || !strings.Contains(out, `id="note-7"`) {
 		t.Fatalf("notes output missing content")
 	}
 }

@@ -57,6 +57,9 @@ func Feed(db store.Store) arry.Handler {
 			},
 		}
 		for _, p := range posts {
+			if p.PostPassword != "" {
+				continue
+			}
 			link := base + "/article/" + p.Slug
 			item := rssItem{
 				Title:       p.Title,
@@ -132,6 +135,7 @@ func Sitemap(db store.Store) arry.Handler {
 
 		add(base+"/", now.Format("2006-01-02"))
 		add(base+"/article", now.Format("2006-01-02"))
+		add(base+"/notes", now.Format("2006-01-02"))
 		add(base+"/categories", now.Format("2006-01-02"))
 		add(base+"/tags", now.Format("2006-01-02"))
 
@@ -148,6 +152,9 @@ func Sitemap(db store.Store) arry.Handler {
 				break
 			}
 			for _, p := range posts {
+				if p.PostPassword != "" {
+					continue
+				}
 				loc := base + "/article/" + p.Slug
 				if p.Type == model.PostTypePage {
 					loc = base + "/article/" + p.Slug
@@ -176,7 +183,7 @@ func Sitemap(db store.Store) arry.Handler {
 func Robots(db store.Store) arry.Handler {
 	return func(ctx arry.Context) {
 		base := siteBaseURL(ctx, db)
-		body := "User-agent: *\nAllow: /\nSitemap: " + base + "/sitemap.xml\n"
+		body := "User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /search\nSitemap: " + base + "/sitemap.xml\n"
 		ctx.SetContentType("text/plain; charset=utf-8")
 		ctx.Status(http.StatusOK)
 		ctx.Response().Write([]byte(body))

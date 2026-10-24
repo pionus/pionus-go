@@ -10,7 +10,7 @@
 {{if .Notes}}
 <ol class="timeline">
   {{range .Notes}}
-  <li class="timeline-item">
+  <li class="timeline-item" id="note-{{.ID}}">
     <time class="timeline-date" datetime="{{.CreatedAt.Format "2006-01-02T15:04:05Z07:00"}}">
       <span class="timeline-month">{{.CreatedAt.Format "Jan"}}</span>
       <span class="timeline-day">{{.CreatedAt.Format "02"}}</span>
@@ -19,6 +19,7 @@
     <div class="timeline-axis" aria-hidden="true"><span class="timeline-dot"></span></div>
     <div class="timeline-content">
       <div class="note-body">{{.HTML}}</div>
+      <a class="note-permalink" href="#note-{{.ID}}" aria-label="链接到这条微语">#</a>
     </div>
   </li>
   {{end}}

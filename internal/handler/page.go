@@ -218,6 +218,7 @@ func Search(db store.Store) arry.Handler {
 			data["ArchiveTitle"] = title
 			data["ArchiveKind"] = "search"
 			data["SearchQuery"] = ""
+			data["NoIndex"] = true
 		} else {
 			data, err = listData(ctx, db, store.PostFilter{
 				Page:  parsePage(ctx),
@@ -231,6 +232,7 @@ func Search(db store.Store) arry.Handler {
 			}
 			data["ArchiveTitle"] = title
 			data["ArchiveKind"] = "search"
+			data["NoIndex"] = true
 		}
 		ctx.Render(http.StatusOK, "archive.html", data)
 	}

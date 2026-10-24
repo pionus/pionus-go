@@ -140,6 +140,9 @@ func listData(ctx arry.Context, db store.Store, f store.PostFilter, title, base 
 	data["NextURL"] = pageURL(base, f.Page+1, extra)
 	data["BaseURL"] = base
 	data["ExtraQuery"] = extra
+	if f.Page > 1 {
+		data["NoIndex"] = true
+	}
 
 	if groupByYear {
 		groups := make([]YearGroup, 0)
