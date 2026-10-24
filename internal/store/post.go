@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/pionus/pionus-go/internal/model"
 )
@@ -217,9 +218,14 @@ func postWhere(f PostFilter) (string, []any) {
 	}
 
 	if f.Query != "" {
-		like := "%" + f.Query + "%"
-		clauses = append(clauses, "(p.title LIKE ? OR p.content LIKE ?)")
-		args = append(args, like, like)
+		if utf8.RuneCountInString(f.Query) >= 3 {
+			clauses = append(clauses, "p.id IN (SELECT post_id FROM posts_fts WHERE posts_fts MATCH ?)")
+			args = append(args, ftsPhrase(f.Query))
+		} else {
+			like := "%" + f.Query + "%"
+			clauses = append(clauses, "(p.title LIKE ? OR p.content LIKE ?)")
+			args = append(args, like, like)
+		}
 	}
 
 	if f.PublishedBefore != nil {
@@ -510,6 +516,10 @@ func boolInt(v bool) int {
 		return 1
 	}
 	return 0
+}
+
+func ftsPhrase(query string) string {
+	return `"` + strings.ReplaceAll(query, `"`, `""`) + `"`
 }
 
 func isUniqueViolation(err error) bool {

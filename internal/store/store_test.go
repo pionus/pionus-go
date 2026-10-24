@@ -368,6 +368,53 @@ func TestMedia(t *testing.T) {
 	}
 }
 
+func TestFTSSearch(t *testing.T) {
+	s := newTestStore(t)
+	posts := []*model.Post{
+		{Slug: "sql", Title: "SQL注入的几点误区", Content: "数据库安全内容", Status: model.StatusPublish},
+		{Slug: "hello", Title: "Hello World", Content: "plain english body", Status: model.StatusPublish},
+	}
+	for _, p := range posts {
+		if err := s.CreatePost(p); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	tests := []struct {
+		query string
+		want  int
+	}{
+		{"SQL注入", 1},
+		{"注入", 1},      // 2 chars: LIKE fallback
+		{"english", 1}, // 7 chars: FTS
+		{"missing", 0},
+	}
+	for _, tc := range tests {
+		list, total, err := s.ListPosts(PostFilter{Query: tc.query})
+		if err != nil {
+			t.Fatalf("%q: %v", tc.query, err)
+		}
+		if total != tc.want || len(list) != tc.want {
+			t.Fatalf("%q: total=%d list=%d, want %d", tc.query, total, len(list), tc.want)
+		}
+	}
+
+	// Content updates must refresh the FTS index.
+	got, err := s.GetPost("sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdatePostContent(got.ID, "完全不同的内容", "完全不同的内容"); err != nil {
+		t.Fatal(err)
+	}
+	if _, total, _ := s.ListPosts(PostFilter{Query: "数据库安全"}); total != 0 {
+		t.Fatalf("old FTS content still matches")
+	}
+	if _, total, _ := s.ListPosts(PostFilter{Query: "完全不同"}); total != 1 {
+		t.Fatalf("new FTS content does not match")
+	}
+}
+
 func TestNotes(t *testing.T) {
 	s := newTestStore(t)
 
