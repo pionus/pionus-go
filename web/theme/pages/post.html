@@ -12,8 +12,10 @@
     <p class="post-meta">
       {{if .Post.Author}}<span>{{.Post.Author}}</span>{{end}}
       <time datetime="{{.Post.DisplayTime.Format "2006-01-02T15:04:05Z07:00"}}">{{date .Post.DisplayTime}}</time>
+      {{if not .IsPage}}
       <span>{{.ReadingTime}} 分钟阅读</span>
       <span>{{.Post.Views}} 次阅读</span>
+      {{end}}
     </p>
   </header>
 
@@ -53,7 +55,7 @@
     {{end}}
   </div>
 
-  {{template "comments" .}}
+  {{if not .IsPage}}{{template "comments" .}}{{end}}
 </article>
 {{end}}
 

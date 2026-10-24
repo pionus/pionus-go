@@ -340,6 +340,39 @@ func TestMedia(t *testing.T) {
 	}
 }
 
+func TestNotes(t *testing.T) {
+	s := newTestStore(t)
+
+	n := &model.Note{Content: "第一条微语", Source: "test", SourceID: "1"}
+	if err := s.CreateNote(n); err != nil {
+		t.Fatal(err)
+	}
+	if n.ID == 0 || n.Status != model.StatusPublish {
+		t.Fatalf("note = %+v", n)
+	}
+
+	got, err := s.GetNoteBySource("test", "1")
+	if err != nil || got.ID != n.ID {
+		t.Fatalf("get note: %+v %v", got, err)
+	}
+
+	list, total, err := s.ListNotes(NoteFilter{Statuses: []string{model.StatusPublish}})
+	if err != nil || total != 1 || len(list) != 1 {
+		t.Fatalf("list notes total=%d len=%d err=%v", total, len(list), err)
+	}
+	count, err := s.CountNotes("")
+	if err != nil || count != 1 {
+		t.Fatalf("count=%d err=%v", count, err)
+	}
+
+	if err := s.DeleteNote(n.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.GetNoteBySource("test", "1"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("after delete err=%v", err)
+	}
+}
+
 func TestPublishedBeforeFiltersScheduledPosts(t *testing.T) {
 	s := newTestStore(t)
 

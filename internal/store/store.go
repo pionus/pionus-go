@@ -20,6 +20,7 @@ type Store interface {
 	CommentStore
 	UserStore
 	MediaStore
+	NoteStore
 	OptionStore
 	Close() error
 }
@@ -127,6 +128,15 @@ type UserStore interface {
 	DeleteSession(tokenHash string) error
 	DeleteUserSessions(userID int64) error
 	DeleteExpiredSessions(now time.Time) error
+}
+
+// NoteStore manages short posts shown in the 微语 timeline.
+type NoteStore interface {
+	ListNotes(f NoteFilter) ([]*model.Note, int, error)
+	GetNoteBySource(source, sourceID string) (*model.Note, error)
+	CreateNote(n *model.Note) error
+	DeleteNote(id int64) error
+	CountNotes(status string) (int, error)
 }
 
 // MediaStore manages the uploaded-file library.

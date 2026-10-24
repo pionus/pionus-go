@@ -22,6 +22,7 @@ COPY --from=builder /out/pionus ./pionus
 COPY --from=builder /out/pionus-migrate ./pionus-migrate
 COPY --from=builder /src/config.yaml ./config.yaml
 COPY --from=builder /src/markdowns ./markdowns
+COPY --from=builder /src/migration ./migration
 
 USER pionus
 EXPOSE 8087

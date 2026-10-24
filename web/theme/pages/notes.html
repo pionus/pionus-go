@@ -1,0 +1,37 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<header class="page-head">
+  <p class="eyebrow">Notes</p>
+  <h1>微语</h1>
+  <p class="muted">短句、碎片，和一些随手记下的东西。共 {{.Total}} 条。</p>
+</header>
+
+{{if .Notes}}
+<ol class="timeline">
+  {{range .Notes}}
+  <li class="timeline-item">
+    <span class="timeline-dot" aria-hidden="true"></span>
+    <div class="timeline-content">
+      <time datetime="{{.CreatedAt.Format "2006-01-02T15:04:05Z07:00"}}">{{date .CreatedAt}}</time>
+      <div class="note-body">{{.HTML}}</div>
+    </div>
+  </li>
+  {{end}}
+</ol>
+
+{{if gt .TotalPages 1}}
+<nav class="pager" aria-label="分页">
+  {{if .HasPrev}}<a href="{{.PrevURL}}" rel="prev">← 更早</a>{{else}}<span></span>{{end}}
+  <span class="pager-info">{{.Page}} / {{.TotalPages}}</span>
+  {{if .HasNext}}<a href="{{.NextURL}}" rel="next">更新 →</a>{{else}}<span></span>{{end}}
+</nav>
+{{end}}
+{{else}}
+<div class="empty-state">
+  <p>还没有微语。</p>
+</div>
+{{end}}
+{{end}}
+
+{{define "scripts"}}{{end}}

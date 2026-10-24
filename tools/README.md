@@ -12,8 +12,8 @@ TYPECHO_ROOT=/www/blog php typecho-export.php > typecho.json
 ```
 
 The exporter includes posts, pages, drafts (as `post_draft` rows), categories,
-tags, relationships, comments, users (without password hashes) and site
-options.
+tags, relationships, comments, users (without password hashes), site options
+and the custom `dreams` short-post table used for the 微语 timeline.
 
 Copy the attachment directory as well if you want images:
 
@@ -80,6 +80,15 @@ PIONUS_ADMIN_PASSWORD='new-password' pionus -config config.yaml -create-admin Se
   routes (`/article/<slug>`, `/category/<slug>`, `/tag/<slug>`).
 - Attachments are copied to `upload.dir` and recorded in `media` when the
   source file exists.
+- Rows from the old `dreams` table become 微语 timeline notes.
+- `migration/pages/<slug>.md` overrides the body of imported pages whose old
+  content lived in PHP theme templates. This repo provides `links.md`
+  (传送门 friend links) and `t.md` (微语 pointer). Friend avatars are fetched
+  live from GitHub (`https://github.com/<user>.png`); the theme falls back to
+  an initial when an avatar is unavailable.
+- The old `dreams` table is imported as the 微语 timeline. There was no
+  `typecho_weiyu` table on the old server, so these six 2018 short posts are
+  the only timeline data available.
 
 Old Typecho URLs are deliberately not redirected: `/index.php/...`,
 `/<slug>.html`, `/2015/03/` and similar addresses return the new site's 404.

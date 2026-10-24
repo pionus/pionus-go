@@ -36,9 +36,10 @@
   <div class="wrap header-inner">
     <a class="brand" href="/">{{.Site.Title}}</a>
     <nav class="nav" aria-label="主导航">
-      <a href="/article" {{if contains .CurrentPath "/article"}}class="active"{{end}}>文章</a>
+      <a href="/article" {{if and (contains .CurrentPath "/article") (not .IsPage)}}class="active"{{end}}>文章</a>
       <a href="/categories" {{if eq .CurrentPath "/categories"}}class="active"{{end}}>分类</a>
       <a href="/tags" {{if eq .CurrentPath "/tags"}}class="active"{{end}}>标签</a>
+      <a href="/notes" {{if eq .CurrentPath "/notes"}}class="active"{{end}}>微语</a>
       {{range .NavPages}}<a href="/article/{{.Slug}}" {{if eq $.CurrentPath (printf "/article/%s" .Slug)}}class="active"{{end}}>{{.Title}}</a>{{end}}
       <a href="/feed" title="RSS 订阅">RSS</a>
     </nav>

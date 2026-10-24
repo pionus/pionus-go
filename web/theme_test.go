@@ -2,6 +2,7 @@ package web
 
 import (
 	"bytes"
+	"html/template"
 	"strings"
 	"testing"
 	"time"
@@ -127,6 +128,25 @@ func TestPostTemplate(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Fatalf("post output missing %q", want)
 		}
+	}
+}
+
+func TestNotesTemplate(t *testing.T) {
+	data := siteData("微语")
+	data["Notes"] = []map[string]any{
+		{"HTML": template.HTML("<p>一条微语</p>"), "CreatedAt": time.Now()},
+	}
+	data["Total"] = 1
+	data["Page"] = 1
+	data["TotalPages"] = 1
+	data["HasPrev"] = false
+	data["HasNext"] = false
+	data["PrevURL"] = ""
+	data["NextURL"] = ""
+
+	out := renderTemplate(t, "notes.html", data)
+	if !strings.Contains(out, "一条微语") || !strings.Contains(out, "timeline-item") {
+		t.Fatalf("notes output missing content")
 	}
 }
 

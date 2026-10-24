@@ -9,8 +9,10 @@ URLs are not preserved; imported content links are rewritten to the new routes.
 
 - Posts and independent pages, drafts, private and scheduled publishing
 - Categories, tags, threaded comments with moderation
+- 微语 timeline for short posts, with a simple admin composer
 - Paper & Ink public theme (embedded): archive, category/tag/date pages,
   search, TOC, code copy, KaTeX math, dark mode, broken-image placeholders
+- 传送门 friend-links page and 微语 timeline
 - Native threaded comments with moderation, CSRF, honeypot and HTML sanitizing
 - RSS feed, comments feed, sitemap and robots.txt
 - Admin UI at `/admin`: dashboard, Markdown editor with preview, media
@@ -53,8 +55,10 @@ PIONUS_ADMIN_PASSWORD='new-password' ./pionus -config config.yaml -create-admin 
 ```
 
 The migration command runs import, link repair and image audit, and prints a
-JSON report. Re-run with `--skip-import` to repair links on an existing
-database.
+JSON report. It also imports the old `dreams` short-post table as the 微语
+timeline and applies curated page overrides from `migration/pages` (传送门
+friend links, 微语 pointer). Re-run with `--skip-import` to repair links on an
+existing database.
 
 Old Typecho URLs are intentionally not redirected. Imported content internal
 links point at the new routes, so bookmarks to the old PHP addresses will 404.

@@ -17,16 +17,18 @@ import (
 )
 
 type report struct {
-	Import *typecho.Report    `json:"import,omitempty"`
-	Links  *typecho.FixReport `json:"links,omitempty"`
-	Images *imageaudit.Report `json:"images,omitempty"`
-	Verify *verifyReport      `json:"verify,omitempty"`
+	Import *typecho.Report             `json:"import,omitempty"`
+	Links  *typecho.FixReport          `json:"links,omitempty"`
+	Images *imageaudit.Report          `json:"images,omitempty"`
+	Pages  *typecho.PageOverrideReport `json:"pages,omitempty"`
+	Verify *verifyReport               `json:"verify,omitempty"`
 }
 
 type verifyReport struct {
 	Posts      int `json:"posts"`
 	Pages      int `json:"pages"`
 	Comments   int `json:"comments"`
+	Notes      int `json:"notes"`
 	Categories int `json:"categories"`
 	Tags       int `json:"tags"`
 	OldLinks   int `json:"remaining_old_links"`
@@ -43,6 +45,7 @@ func main() {
 	skipLinks := flag.Bool("skip-links", false, "do not repair old links")
 	skipImages := flag.Bool("skip-images", false, "do not audit images")
 	onlineAudit := flag.Bool("online-audit", false, "check external image URLs during audit")
+	pagesDir := flag.String("pages", "migration/pages", "directory of <slug>.md page overrides (custom theme pages)")
 	backup := flag.Bool("backup", true, "create a timestamped SQLite backup before writing")
 	flag.Parse()
 
@@ -77,6 +80,11 @@ func main() {
 		slog.Info("database backed up", "path", backupPath)
 	}
 
+	pageOverrides, err := typecho.LoadPageOverrides(*pagesDir)
+	if err != nil {
+		fatal("load page overrides", err)
+	}
+
 	var out report
 
 	if !*skipImport {
@@ -93,6 +101,7 @@ func main() {
 			DestUploads:   uploads,
 			DryRun:        *dryRun,
 			ImportDrafts:  *importDrafts,
+			PageOverrides: pageOverrides,
 		})
 		f.Close()
 		if err != nil {
@@ -100,6 +109,13 @@ func main() {
 		}
 		out.Import = importReport
 		printImport(importReport)
+	} else if len(pageOverrides) > 0 {
+		pageReport, err := typecho.ApplyPageOverrides(db, pageOverrides, *dryRun)
+		if err != nil {
+			fatal("apply page overrides", err)
+		}
+		out.Pages = pageReport
+		slog.Info("page overrides", "applied", len(pageReport.Applied), "missing", pageReport.Missing)
 	}
 
 	if !*skipLinks {
@@ -139,6 +155,7 @@ func main() {
 		"posts", verify.Posts,
 		"pages", verify.Pages,
 		"comments", verify.Comments,
+		"notes", verify.Notes,
 		"categories", verify.Categories,
 		"tags", verify.Tags,
 		"remaining_old_links", verify.OldLinks)
@@ -166,6 +183,9 @@ func verifyDatabase(db *store.SQLiteStore) *verifyReport {
 	if _, total, err := db.ListComments(store.CommentFilter{Page: 1, Limit: 1}); err == nil {
 		v.Comments = total
 	}
+	if total, err := db.CountNotes(""); err == nil {
+		v.Notes = total
+	}
 	if categories, err := db.ListCategories(); err == nil {
 		v.Categories = len(categories)
 	}
@@ -183,10 +203,15 @@ func printImport(r *typecho.Report) {
 		"posts", r.Posts,
 		"pages", r.Pages,
 		"comments", r.Comments,
+		"notes", r.Notes,
+		"pages_overridden", r.PagesOverridden,
 		"attachments", r.Attachments,
 		"updated", r.Updated,
 		"skipped_drafts", r.SkippedDrafts,
 		"skipped_attachments", r.SkippedAttachments)
+	if len(r.MissingPages) > 0 {
+		slog.Warn("page overrides without a matching page", "slugs", r.MissingPages)
+	}
 	for _, warning := range r.Warnings {
 		slog.Warn(warning)
 	}

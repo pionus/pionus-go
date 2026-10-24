@@ -53,6 +53,14 @@ func baseData(ctx arry.Context, db store.Store, title string) map[string]any {
 		Page:     1,
 		Limit:    10,
 	})
+	navPages := make([]*model.Post, 0, len(pages))
+	for _, p := range pages {
+		// 微语 is now a dedicated timeline at /notes.
+		if p.Slug == "t" || p.Template == "t.php" {
+			continue
+		}
+		navPages = append(navPages, p)
+	}
 
 	return map[string]any{
 		"Site":         site,
@@ -61,7 +69,7 @@ func baseData(ctx arry.Context, db store.Store, title string) map[string]any {
 		"CurrentPath":  ctx.Request().URL.Path,
 		"Year":         time.Now().Year(),
 		"SearchQuery":  ctx.Query("q"),
-		"NavPages":     pages,
+		"NavPages":     navPages,
 		"CanonicalURL": canonicalURL(ctx, site),
 	}
 }

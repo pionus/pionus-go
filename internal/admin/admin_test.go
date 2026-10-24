@@ -365,6 +365,35 @@ func TestSettingsSave(t *testing.T) {
 	}
 }
 
+func TestAdminNotes(t *testing.T) {
+	e := newTestEnv(t)
+	e.setup(t)
+
+	resp := e.postForm(t, "/admin/notes/create", url.Values{"content": {"一条后台微语"}})
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("create note status = %d", resp.StatusCode)
+	}
+
+	notes, total, err := e.store.ListNotes(store.NoteFilter{})
+	if err != nil || total != 1 {
+		t.Fatalf("notes total=%d err=%v", total, err)
+	}
+
+	resp = e.get(t, "/admin/notes")
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), "一条后台微语") {
+		t.Fatalf("notes page status=%d", resp.StatusCode)
+	}
+
+	resp = e.postForm(t, "/admin/notes/delete", url.Values{"id": {fmt.Sprint(notes[0].ID)}})
+	resp.Body.Close()
+	if _, total, _ := e.store.ListNotes(store.NoteFilter{}); total != 0 {
+		t.Fatalf("note not deleted")
+	}
+}
+
 func TestCommentModeration(t *testing.T) {
 	e := newTestEnv(t)
 	e.setup(t)

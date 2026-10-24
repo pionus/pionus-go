@@ -33,7 +33,10 @@ type Options struct {
 	DryRun bool
 	// ImportDrafts also imports typecho post_draft rows (autosave revisions).
 	ImportDrafts bool
-	Logger       *slog.Logger
+	// PageOverrides replaces page bodies by slug (content that lived in old
+	// PHP theme templates).
+	PageOverrides map[string]string
+	Logger        *slog.Logger
 }
 
 // Report summarizes an import.
@@ -44,11 +47,14 @@ type Report struct {
 	Posts              int      `json:"posts"`
 	Pages              int      `json:"pages"`
 	Comments           int      `json:"comments"`
+	Notes              int      `json:"notes"`
 	Attachments        int      `json:"attachments"`
 	Updated            int      `json:"updated"`
 	SkippedDrafts      int      `json:"skipped_drafts"`
 	SkippedAttachments int      `json:"skipped_attachments"`
 	NeedsPasswordReset bool     `json:"needs_password_reset,omitempty"`
+	PagesOverridden    int      `json:"pages_overridden,omitempty"`
+	MissingPages       []string `json:"missing_pages,omitempty"`
 	MissingUploads     []string `json:"missing_uploads,omitempty"`
 	Warnings           []string `json:"warnings,omitempty"`
 }
@@ -122,6 +128,17 @@ func Import(reader io.Reader, opts Options) (*Report, error) {
 	if err := im.importComments(); err != nil {
 		return nil, err
 	}
+	if err := im.importNotes(); err != nil {
+		return nil, err
+	}
+	if len(im.opts.PageOverrides) > 0 {
+		pages, err := ApplyPageOverrides(im.opts.Store, im.opts.PageOverrides, false)
+		if err != nil {
+			return nil, err
+		}
+		im.report.PagesOverridden = len(pages.Applied)
+		im.report.MissingPages = pages.Missing
+	}
 	if err := im.applySiteOptions(); err != nil {
 		return nil, err
 	}
@@ -162,6 +179,15 @@ func (im *importer) dryRun() (*Report, error) {
 		}
 	}
 	im.report.Comments = len(im.ex.Comments)
+	im.report.Notes = len(im.ex.Dreams)
+	if len(im.opts.PageOverrides) > 0 {
+		pages, err := ApplyPageOverrides(im.opts.Store, im.opts.PageOverrides, true)
+		if err != nil {
+			return nil, err
+		}
+		im.report.PagesOverridden = len(pages.Applied)
+		im.report.MissingPages = pages.Missing
+	}
 	im.report.Warnings = append(im.report.Warnings, "dry run: nothing was written")
 	return im.report, nil
 }
@@ -532,6 +558,42 @@ func (im *importer) importComment(c Comment) error {
 	}
 	im.commentIDs[c.Coid] = comment.ID
 	im.report.Comments++
+	return nil
+}
+
+func (im *importer) importNotes() error {
+	for _, d := range im.ex.Dreams {
+		sourceID := strconv.FormatInt(d.ID, 10)
+		if _, err := im.opts.Store.GetNoteBySource("typecho-dreams", sourceID); err == nil {
+			continue
+		} else if !errors.Is(err, store.ErrNotFound) {
+			return fmt.Errorf("lookup note %d: %w", d.ID, err)
+		}
+
+		created := time.Now()
+		for _, layout := range []string{"2006-01-02 15:04:05", time.RFC3339} {
+			if t, err := time.ParseInLocation(layout, strings.TrimSpace(d.Created), time.Local); err == nil {
+				created = t
+				break
+			}
+		}
+		content := strings.TrimSpace(d.Content)
+		if content == "" {
+			continue
+		}
+		note := &model.Note{
+			Content:   content,
+			Status:    model.StatusPublish,
+			CreatedAt: created,
+			UpdatedAt: created,
+			Source:    "typecho-dreams",
+			SourceID:  sourceID,
+		}
+		if err := im.opts.Store.CreateNote(note); err != nil {
+			return fmt.Errorf("create note %d: %w", d.ID, err)
+		}
+		im.report.Notes++
+	}
 	return nil
 }
 

@@ -147,6 +147,7 @@ func main() {
 	router.Get("/archives/:year/:month", handler.DateArchive(db))
 	router.Get("/archives/:year/:month/:day", handler.DateArchive(db))
 	router.Get("/search", handler.Search(db))
+	router.Get("/notes", handler.NotesPage(db))
 	router.Get("/categories", handler.CategoriesPage(db))
 	router.Get("/tags", handler.TagsPage(db))
 	router.Get("/feed", handler.Feed(db))

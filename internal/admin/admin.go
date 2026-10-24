@@ -104,6 +104,10 @@ func (a *Admin) Register(app *arry.Arry) {
 	priv.Post("/tags/update", a.tagUpdate)
 	priv.Post("/tags/delete", a.tagDelete)
 
+	priv.Get("/notes", a.noteList)
+	priv.Post("/notes/create", a.noteCreate)
+	priv.Post("/notes/delete", a.noteDelete)
+
 	priv.Get("/comments", a.commentList)
 	priv.Post("/comments/status", a.commentStatus)
 	priv.Post("/comments/delete", a.commentDelete)

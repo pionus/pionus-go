@@ -37,6 +37,7 @@ func (a *Admin) dashboard(ctx arry.Context) {
 
 	categories, _ := a.store.ListCategories()
 	tags, _ := a.store.ListTags()
+	notesTotal, _ := a.store.CountNotes("")
 
 	data := a.base(ctx, "仪表盘")
 	data["Published"] = published
@@ -47,6 +48,7 @@ func (a *Admin) dashboard(ctx arry.Context) {
 	data["MediaTotal"] = mediaTotal
 	data["CategoryTotal"] = len(categories)
 	data["TagTotal"] = len(tags)
+	data["NotesTotal"] = notesTotal
 	data["LatestPosts"] = latest
 	data["Pending"] = pendingComments
 	a.render(ctx, http.StatusOK, "dashboard.html", data)

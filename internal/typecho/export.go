@@ -11,6 +11,7 @@ type Export struct {
 	Comments      []Comment      `json:"comments"`
 	Users         []User         `json:"users"`
 	Fields        []Field        `json:"fields"`
+	Dreams        []Dream        `json:"dreams"`
 	Options       []Option       `json:"options"`
 }
 
@@ -115,6 +116,15 @@ type Field struct {
 	Str   string `json:"str_value"`
 	Int   int64  `json:"int_value"`
 	Float string `json:"float_value"`
+}
+
+// Dream is a short post from the old custom `dreams` table, used here as the
+// 微语 timeline source.
+type Dream struct {
+	ID      int64  `json:"id"`
+	Author  string `json:"author"`
+	Content string `json:"content"`
+	Created string `json:"created"`
 }
 
 // Option is a row from typecho_options.

@@ -63,7 +63,13 @@
     img.replaceWith(span);
   }
 
-  document.querySelectorAll('.prose img').forEach(function (img) {
+  document.querySelectorAll('img.friend-avatar').forEach(function (img) {
+    var hide = function () { img.remove(); };
+    img.addEventListener('error', hide);
+    if (img.complete && img.naturalWidth === 0) hide();
+  });
+
+  document.querySelectorAll('.prose img:not(.friend-avatar)').forEach(function (img) {
     img.addEventListener('error', function () { brokenImage(img); });
     if (img.complete && img.naturalWidth === 0) brokenImage(img);
   });

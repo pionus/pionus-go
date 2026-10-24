@@ -61,6 +61,10 @@ func sampleExport() Export {
 				Text: `a:5:{s:4:"name";s:5:"a.jpg";s:4:"path";s:31:"/usr/uploads/2015/03/a.jpg";s:4:"size";i:12;s:4:"type";s:3:"jpg";s:4:"mime";s:10:"image/jpeg";}`,
 			},
 		},
+		Dreams: []Dream{
+			{ID: 1, Author: "me@example.com", Content: "dream one", Created: "2018-02-25 11:00:50"},
+			{ID: 2, Author: "me@example.com", Content: "dream two\nsecond line", Created: "2018-03-01 00:00:00"},
+		},
 		Comments: []Comment{
 			{Coid: 1, CID: 10, Author: "A", Mail: "a@example.com", Text: "first", Status: "approved", Created: 1326000000},
 			{Coid: 2, CID: 10, Parent: 1, Author: "B", Text: "reply <img src=\"/usr/uploads/2015/03/a.jpg\"> <a href=\"http://old.example/index.php/archives/10/\">self</a>", Status: "waiting", Created: 1326000100},
@@ -93,13 +97,19 @@ func TestImport(t *testing.T) {
 	t.Cleanup(func() { time.Local = oldLocal })
 
 	db := newStore(t)
-	rep, err := Import(bytes.NewReader(exportJSON(t, sampleExport())), Options{Store: db})
+	rep, err := Import(bytes.NewReader(exportJSON(t, sampleExport())), Options{
+		Store:         db,
+		PageOverrides: map[string]string{"about": "# Overridden page"},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if rep.Users != 1 || rep.Posts != 2 || rep.Pages != 1 || rep.Comments != 2 {
+	if rep.Users != 1 || rep.Posts != 2 || rep.Pages != 1 || rep.Comments != 2 || rep.Notes != 2 {
 		t.Fatalf("report = %+v", rep)
+	}
+	if rep.PagesOverridden != 1 {
+		t.Fatalf("pages overridden = %d", rep.PagesOverridden)
 	}
 
 	user, err := db.GetUserByUsername("Secbone")
@@ -159,6 +169,14 @@ func TestImport(t *testing.T) {
 	}
 	if page.Type != model.PostTypePage || page.Template != "about.php" {
 		t.Fatalf("page = %+v", page)
+	}
+	if !strings.Contains(page.Content, "Overridden page") {
+		t.Fatalf("page override missing: %q", page.Content)
+	}
+
+	notes, noteTotal, err := db.ListNotes(store.NoteFilter{})
+	if err != nil || noteTotal != 2 || len(notes) != 2 {
+		t.Fatalf("notes total=%d len=%d err=%v", noteTotal, len(notes), err)
 	}
 
 	comments, total, err := db.ListComments(store.CommentFilter{PostID: htmlPost.ID})

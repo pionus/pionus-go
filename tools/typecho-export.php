@@ -62,6 +62,14 @@ try {
     // Older Typecho installs may not have the fields table.
 }
 
+// The old blog kept short posts (微语) in a custom `dreams` table.
+$dreams = array();
+try {
+    $dreams = $db->fetchAll($db->select()->from('dreams')->order('id', Typecho_Db::SORT_ASC));
+} catch (Exception $e) {
+    // Not every Typecho site has this extra table.
+}
+
 $site = array(
     'url' => optionValue($options, 'siteUrl'),
     'title' => optionValue($options, 'title'),
@@ -97,6 +105,7 @@ $out = array(
         return $u;
     }, $users),
     'fields' => $fields,
+    'dreams' => $dreams,
     'options' => $options,
 );
 

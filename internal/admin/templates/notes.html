@@ -1,0 +1,46 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<h1>微语</h1>
+
+{{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+
+<div class="panel">
+  <h2>写一条微语</h2>
+  <form method="post" action="/admin/notes/create">
+    <input type="hidden" name="_csrf" value="{{.CSRF}}">
+    <div class="field">
+      <label for="content">内容</label>
+      <textarea id="content" name="content" rows="5" maxlength="2000" required placeholder="随手记点什么…"></textarea>
+      <div class="muted">支持 Markdown；最多 2000 个字符。</div>
+    </div>
+    <button class="btn primary" type="submit">发布</button>
+  </form>
+</div>
+
+<div class="panel">
+  <div class="page-head"><h2>全部微语</h2><span class="muted">共 {{.Total}} 条</span></div>
+  {{if .Notes}}
+  {{range .Notes}}
+  <div class="comment" style="margin-bottom:12px">
+    <div class="meta">{{datetime .CreatedAt}}</div>
+    <div class="body" style="white-space:pre-wrap">{{.Content}}</div>
+    <form class="inline" method="post" action="/admin/notes/delete" style="margin-top:8px">
+      <input type="hidden" name="_csrf" value="{{$.CSRF}}">
+      <input type="hidden" name="id" value="{{.ID}}">
+      <button class="btn small danger" type="submit" onclick="return confirm('删除这条微语？')">删除</button>
+    </form>
+  </div>
+  {{end}}
+  {{if gt .TotalPages 1}}
+  <div class="pager">
+    {{if .HasPrev}}<a href="/admin/notes?page={{.PrevPage}}">← 上一页</a>{{end}}
+    <span>{{.Page}} / {{.TotalPages}}</span>
+    {{if .HasNext}}<a href="/admin/notes?page={{.NextPage}}">下一页 →</a>{{end}}
+  </div>
+  {{end}}
+  {{else}}
+  <p class="muted">还没有微语。</p>
+  {{end}}
+</div>
+{{end}}

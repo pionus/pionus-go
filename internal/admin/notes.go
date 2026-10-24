@@ -1,0 +1,77 @@
+package admin
+
+import (
+	"errors"
+	"net/http"
+	"strings"
+	"unicode/utf8"
+
+	"github.com/pionus/arry"
+	"github.com/pionus/pionus-go/internal/model"
+	"github.com/pionus/pionus-go/internal/store"
+)
+
+func (a *Admin) noteList(ctx arry.Context) {
+	page, limit := pageOf(ctx, 30)
+	notes, total, err := a.store.ListNotes(store.NoteFilter{Page: page, Limit: limit})
+	if err != nil {
+		logErr("admin list notes", "err", err)
+		ctx.Reply(http.StatusInternalServerError)
+		return
+	}
+
+	totalPages := (total + limit - 1) / limit
+	if totalPages < 1 {
+		totalPages = 1
+	}
+
+	data := a.base(ctx, "微语")
+	data["Notes"] = notes
+	data["Total"] = total
+	data["Page"] = page
+	data["TotalPages"] = totalPages
+	data["HasPrev"] = page > 1
+	data["HasNext"] = page < totalPages
+	data["PrevPage"] = page - 1
+	data["NextPage"] = page + 1
+
+	switch ctx.Query("error") {
+	case "empty":
+		data["Error"] = "微语内容不能为空。"
+	case "too_long":
+		data["Error"] = "微语最多 2000 个字符。"
+	}
+	a.render(ctx, http.StatusOK, "notes.html", data)
+}
+
+func (a *Admin) noteCreate(ctx arry.Context) {
+	content := strings.TrimSpace(ctx.Request().PostFormValue("content"))
+	if content == "" {
+		a.redirect(ctx, "/admin/notes?error=empty")
+		return
+	}
+	if utf8.RuneCountInString(content) > 2000 {
+		a.redirect(ctx, "/admin/notes?error=too_long")
+		return
+	}
+
+	note := &model.Note{Content: content, Status: model.StatusPublish}
+	if err := a.store.CreateNote(note); err != nil {
+		logErr("admin create note", "err", err)
+		a.redirect(ctx, "/admin/notes?error=empty")
+		return
+	}
+	a.redirect(ctx, "/admin/notes?saved=1")
+}
+
+func (a *Admin) noteDelete(ctx arry.Context) {
+	id := atoiDefault(ctx.Request().PostFormValue("id"), 0)
+	if id <= 0 {
+		ctx.Reply(http.StatusBadRequest)
+		return
+	}
+	if err := a.store.DeleteNote(int64(id)); err != nil && !errors.Is(err, store.ErrNotFound) {
+		logErr("admin delete note", "id", id, "err", err)
+	}
+	a.redirect(ctx, "/admin/notes?deleted=1")
+}

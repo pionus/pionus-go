@@ -55,7 +55,8 @@ pionus-go/
 │   │   ├── user.go               # User, roles
 │   │   ├── taxonomy.go           # Category, Tag, Slugify
 │   │   ├── comment.go
-│   │   └── media.go              # Media, Session
+│   │   ├── media.go              # Media, Session
+│   │   └── note.go               # 微语 short posts
 │   ├── store/
 │   │   ├── store.go              # Store interfaces + filters + errors
 │   │   ├── sqlite.go             # Connection, WAL, migration runner
@@ -65,6 +66,7 @@ pionus-go/
 │   │   ├── comment.go
 │   │   ├── user.go
 │   │   ├── media.go
+│   │   ├── note.go               # 微语 timeline
 │   │   └── option.go             # Options
 │   ├── content/
 │   │   ├── post.go               # Shared post input validation
@@ -78,6 +80,7 @@ pionus-go/
 │   │   ├── posts.go              # Post list/editor/delete/preview
 │   │   ├── taxonomy.go           # Categories and tags
 │   │   ├── dashboard.go          # Dashboard and comment moderation
+│   │   ├── notes.go              # Admin 微语 timeline
 │   │   ├── media.go              # Uploads and media library
 │   │   ├── settings.go           # Site settings
 │   │   └── templates/            # Server-rendered admin UI (go:embed)
@@ -87,6 +90,7 @@ pionus-go/
 │   │   ├── post.go               # JSON API
 │   │   ├── page.go               # Home, archives, post detail
 │   │   ├── comments.go           # Comment tree, submission, sanitizing
+│   │   ├── notes.go              # 微语 timeline
 │   │   ├── feed.go               # RSS, comments feed, sitemap, robots
 │   │   ├── site.go               # Shared public page data
 │   │   └── notfound.go           # Themed 404 catch-all
@@ -95,6 +99,10 @@ pionus-go/
 │   └── typecho/                  # Typecho JSON importer
 │       ├── export.go
 │       └── import.go
+├── migration/
+│   └── pages/                    # Curated overrides for old theme pages
+│       ├── links.md              # 传送门 friend links
+│       └── t.md                  # 微语 pointer
 ├── tools/
 │   └── typecho-export.php        # Read-only Typecho exporter
 ├── web/
@@ -185,6 +193,7 @@ serves templates embedded in the binary.
 | POST | `/admin/posts/:id/delete` | Delete a post |
 | POST | `/admin/preview` | Render Markdown fragment for the editor preview |
 | GET | `/admin/categories`, `/admin/tags` | Taxonomy management |
+| GET/POST | `/admin/notes` | Create/delete 微语 entries |
 | GET | `/admin/comments` | Comment moderation |
 | GET | `/admin/media` | Media library and upload |
 | GET/POST | `/admin/settings` | Site settings |
@@ -210,6 +219,7 @@ Old Typecho URLs are intentionally not supported; they return the themed 404.
 | GET | `/tag/:slug` | Tag archive |
 | GET | `/archives/:year[/:month[/:day]]` | Date archives |
 | GET | `/search?q=` | Search |
+| GET | `/notes` | 微语 timeline |
 | GET | `/categories`, `/tags` | Taxonomy indexes |
 | GET | `/feed`, `/feed/comments` | RSS 2.0 feeds |
 | GET | `/sitemap.xml`, `/robots.txt` | SEO endpoints |
@@ -231,6 +241,7 @@ Old Typecho URLs are intentionally not supported; they return the themed 404.
 | `categories`, `tags` | Taxonomies |
 | `post_categories`, `post_tags` | Many-to-many relations (Typecho-compatible) |
 | `comments` | Threaded comments with `pending`/`approved`/`spam` |
+| `notes` | 微语 short posts for the timeline |
 | `media` | Uploaded files |
 | `sessions` | Server-side login sessions (SHA-256 token hash) |
 | `options` | Site settings |
@@ -248,7 +259,7 @@ Semantics:
 ## Store Interfaces
 
 `store.Store` composes focused interfaces: `PostStore`, `TaxonomyStore`,
-`CommentStore`, `UserStore`, `MediaStore`, `OptionStore`.
+`CommentStore`, `UserStore`, `MediaStore`, `NoteStore`, `OptionStore`.
 Handlers depend on `store.Store`. Errors are matched with `errors.Is` against
 `store.ErrNotFound` and `store.ErrConflict`.
 
@@ -317,8 +328,10 @@ and `verify` sections. Use `--skip-import` to repair links/audit an existing DB
 and `--dry-run` to preview. The importer is idempotent (posts and
 comments match on `source` + `source_id`), preserves HTML vs Markdown
 (`posts.format`), imports categories, tags, relations, comments and views, copies
-attachments when available, and rewrites old internal post/page/category/tag,
-upload and feed links to the new routes. Old Typecho URLs are intentionally not
+attachments when available, imports the old `dreams` short-post table as the
+微语 timeline, applies curated page overrides from `migration/pages`, and
+rewrites old internal post/page/category/tag, upload and feed links to the new
+routes. Old Typecho URLs are intentionally not
 redirected. Details and current gaps are in `tools/README.md`.
 
 ## Development Guidelines
@@ -347,7 +360,9 @@ Done: schema, store layer, JSON API, Paper & Ink public theme (home, archives,
 post, TOC, code copy, KaTeX, responsive dark mode), native comments with
 moderation and sanitizing, search, RSS/comments feeds, sitemap, image fallback,
 embedded assets, and the Typecho importer with idempotent content, taxonomy,
-comment and attachment handling. Old Typecho URLs intentionally return 404.
+comment and attachment handling, the 微语 timeline (from the old `dreams`
+table), and curated 传送门/微语 page overrides. Old Typecho URLs intentionally
+return 404.
 
 Pending for full Typecho parity:
 
