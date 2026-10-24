@@ -20,3 +20,5 @@ typecho.json
 typecho-*.json
 typecho.sql
 *.db.bak-*
+
+backups/

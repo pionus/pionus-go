@@ -1,0 +1,103 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pionus-data
+  namespace: lnmp
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pionus
+  namespace: lnmp
+  labels:
+    app: pionus
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: pionus
+  template:
+    metadata:
+      labels:
+        app: pionus
+    spec:
+      securityContext:
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+        - name: pionus
+          image: ghcr.io/secbone/pionus:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8087
+          env:
+            - name: PIONUS_ADDR
+              value: ":8087"
+            - name: PIONUS_DB_PATH
+              value: /app/data/pionus.db
+            - name: PIONUS_UPLOAD_DIR
+              value: /app/data/uploads
+            - name: PIONUS_ACCESS_LOG
+              value: "-"
+            - name: PIONUS_TIMEZONE
+              value: Asia/Shanghai
+            - name: PIONUS_SESSION_SECURE
+              value: "1"
+            - name: PIONUS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: pionus-secrets
+                  key: secret
+            - name: PIONUS_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: pionus-secrets
+                  key: auth-token
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: pionus-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pionus-service
+  namespace: lnmp
+spec:
+  selector:
+    app: pionus
+  ports:
+    - name: http
+      port: 8087
+      targetPort: http
