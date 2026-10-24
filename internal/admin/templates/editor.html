@@ -13,6 +13,7 @@
 
 <form id="editor-form" method="post" action="{{if .IsNew}}/admin/posts{{else}}/admin/posts/{{.Post.ID}}{{end}}">
   <input type="hidden" name="_csrf" value="{{.CSRF}}">
+  <input type="hidden" name="template" value="{{.Post.Template}}">
   <div class="editor">
     <div>
       <div class="panel">
@@ -59,6 +60,14 @@
             <option value="post" {{if eq .Post.Type "post"}}selected{{end}}>文章</option>
             <option value="page" {{if eq .Post.Type "page"}}selected{{end}}>独立页面</option>
           </select>
+        </div>
+        <div class="field">
+          <label for="format">正文格式</label>
+          <select id="format" name="format">
+            <option value="markdown" {{if eq .Post.Format "markdown"}}selected{{end}}>Markdown</option>
+            <option value="html" {{if eq .Post.Format "html"}}selected{{end}}>HTML（原样输出）</option>
+          </select>
+          <div class="muted">从 Typecho 导入的旧文章多为 HTML，请保持 HTML 格式。</div>
         </div>
         <div class="field">
           <label for="published_at">发布时间</label>

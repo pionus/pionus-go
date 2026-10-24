@@ -32,10 +32,27 @@ go run . -create-admin admin -admin-password 'change-me-please'
 Public site: <http://localhost:8087/>. API: `/api/posts` (writes need
 `PIONUS_AUTH_TOKEN` or an admin session).
 
+## Migrating from Typecho
+
+Export the old database read-only, then import it:
+
+```bash
+# on the Typecho server
+TYPECHO_ROOT=/www/blog php typecho-export.php > typecho.json
+tar -C /www/blog/usr/uploads -czf uploads.tgz .
+
+# on the new host
+pionus -config config.yaml -import-typecho typecho.json -typecho-dry-run
+pionus -config config.yaml -import-typecho typecho.json -typecho-uploads ./uploads
+PIONUS_ADMIN_PASSWORD='new-password' pionus -config config.yaml -create-admin Secbone
+```
+
+See `tools/README.md` for what is converted and the remaining gaps.
+
 ## Configuration
 
-See `config.yaml` for server, database, upload and session settings, and
-`.env.example` for environment overrides.
+See `config.yaml` for server, timezone, database, upload and session settings,
+and `.env.example` for environment overrides.
 
 ## Development
 

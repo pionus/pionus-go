@@ -14,7 +14,8 @@ const postColumnTemplate = `
 	p.id, p.slug, p.title, %s, p.excerpt, p.cover, p.type, p.status,
 	p.author_id, COALESCE(NULLIF(u.screen_name, ''), NULLIF(u.username, ''),
 		(SELECT value FROM options WHERE name = 'site.author'), '') AS author,
-	p.post_password, p.allow_comment, p.pinned, p.views,
+	p.post_password, p.allow_comment, p.pinned, p.views, p.likes,
+	p.format, p.template, p.source, p.source_id,
 	p.published_at, p.created_at, p.updated_at`
 
 type scanner interface {
@@ -32,7 +33,9 @@ func scanPost(s scanner, withContent bool) (*model.Post, error) {
 	if err := s.Scan(
 		&p.ID, &p.Slug, &p.Title, &p.Content, &p.Excerpt, &p.Cover,
 		&p.Type, &p.Status, &authorID, &p.Author, &p.PostPassword,
-		&allowComment, &pinned, &p.Views, &publishedAt, &p.CreatedAt, &p.UpdatedAt,
+		&allowComment, &pinned, &p.Views, &p.Likes,
+		&p.Format, &p.Template, &p.Source, &p.SourceID,
+		&publishedAt, &p.CreatedAt, &p.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
@@ -46,6 +49,10 @@ func scanPost(s scanner, withContent bool) (*model.Post, error) {
 	if publishedAt.Valid {
 		t := publishedAt.Time
 		p.PublishedAt = &t
+	}
+
+	if p.Format == "" {
+		p.Format = model.FormatMarkdown
 	}
 
 	if !withContent {
@@ -63,6 +70,12 @@ func (s *SQLiteStore) GetPost(slug string) (*model.Post, error) {
 
 func (s *SQLiteStore) GetPostByID(id int64) (*model.Post, error) {
 	return s.getPostBy("p.id", id, true)
+}
+
+// GetPostBySource finds imported content by its origin (for example Typecho
+// cid), which makes re-imports idempotent.
+func (s *SQLiteStore) GetPostBySource(source, sourceID string) (*model.Post, error) {
+	return s.getPostBy("(p.source || '/' || p.source_id)", source+"/"+sourceID, true)
 }
 
 func (s *SQLiteStore) getPost(slug string, withTaxonomy bool) (*model.Post, error) {
@@ -277,11 +290,13 @@ func (s *SQLiteStore) CreatePost(p *model.Post) error {
 
 	res, err := tx.Exec(
 		`INSERT INTO posts
-			(slug, title, content, excerpt, cover, type, status, author_id,
-			 post_password, allow_comment, pinned, views, published_at, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.Slug, p.Title, p.Content, p.Excerpt, p.Cover, p.Type, p.Status, p.AuthorID,
-		p.PostPassword, boolInt(p.AllowComment), boolInt(p.Pinned), p.Views,
+			(slug, title, content, excerpt, cover, type, status, format, template,
+			 source, source_id, author_id, post_password, allow_comment, pinned,
+			 views, likes, published_at, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.Slug, p.Title, p.Content, p.Excerpt, p.Cover, p.Type, p.Status,
+		p.Format, p.Template, p.Source, p.SourceID, p.AuthorID,
+		p.PostPassword, boolInt(p.AllowComment), boolInt(p.Pinned), p.Views, p.Likes,
 		p.PublishedAt, p.CreatedAt, p.UpdatedAt,
 	)
 	if err != nil {
@@ -331,6 +346,7 @@ func (s *SQLiteStore) UpdatePost(slug string, p *model.Post) error {
 	_, err = tx.Exec(
 		`UPDATE posts SET
 			title = ?, content = ?, excerpt = ?, cover = ?, type = ?, status = ?,
+			format = ?, template = ?,
 			author_id = ?, post_password = ?, allow_comment = ?, pinned = ?,
 			published_at = CASE
 				WHEN ? IS NOT NULL THEN ?
@@ -339,6 +355,7 @@ func (s *SQLiteStore) UpdatePost(slug string, p *model.Post) error {
 			updated_at = ?
 		 WHERE id = ?`,
 		p.Title, p.Content, p.Excerpt, p.Cover, p.Type, p.Status,
+		p.Format, p.Template,
 		p.AuthorID, p.PostPassword, boolInt(p.AllowComment), boolInt(p.Pinned),
 		p.PublishedAt, p.PublishedAt, p.Status, time.Now(),
 		p.UpdatedAt, id,
@@ -388,6 +405,9 @@ func normalizePost(p *model.Post) {
 
 	if p.Type == "" {
 		p.Type = model.PostTypePost
+	}
+	if p.Format == "" {
+		p.Format = model.FormatMarkdown
 	}
 	if p.Status == "" {
 		p.Status = model.StatusDraft

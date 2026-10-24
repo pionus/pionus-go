@@ -33,8 +33,10 @@ type SessionConfig struct {
 }
 
 type Config struct {
-	Server    ServerConfig   `yaml:"server"`
-	Theme     string         `yaml:"theme"`
+	Server ServerConfig `yaml:"server"`
+	Theme  string       `yaml:"theme"`
+	// Timezone is the IANA zone used for timestamps and display.
+	Timezone  string         `yaml:"timezone"`
 	Database  DatabaseConfig `yaml:"database"`
 	TLS       TLSConfig      `yaml:"tls"`
 	Upload    UploadConfig   `yaml:"upload"`
@@ -51,6 +53,7 @@ func LoadConfig(path string) (*Config, error) {
 	cfg := &Config{
 		Server:   ServerConfig{Addr: ":8087"},
 		Theme:    "default",
+		Timezone: "Asia/Shanghai",
 		Database: DatabaseConfig{Path: "./data/pionus.db"},
 		Upload:   UploadConfig{Dir: "./uploads", MaxSizeMB: 10},
 		Session:  SessionConfig{CookieName: "pionus_session", TTLHours: 24 * 7},
@@ -65,6 +68,9 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	if v := os.Getenv("PIONUS_ADDR"); v != "" {
 		cfg.Server.Addr = v
+	}
+	if v := os.Getenv("PIONUS_TIMEZONE"); v != "" {
+		cfg.Timezone = v
 	}
 	if v := os.Getenv("PIONUS_DB_PATH"); v != "" {
 		cfg.Database.Path = v

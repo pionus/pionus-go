@@ -14,17 +14,43 @@ func (s *SQLiteStore) GetComment(id int64) (*model.Comment, error) {
 	var parentID sql.NullInt64
 	err := s.db.QueryRow(`
 		SELECT c.id, c.post_id, c.parent_id, c.author, c.email, c.url, c.content,
-		       c.status, c.ip, c.user_agent, c.created_at
+		       c.status, c.ip, c.user_agent, c.created_at, c.source, c.source_id
 		FROM comments c WHERE c.id = ?`, id,
 	).Scan(
 		&c.ID, &c.PostID, &parentID, &c.Author, &c.Email, &c.URL, &c.Content,
-		&c.Status, &c.IP, &c.UserAgent, &c.CreatedAt,
+		&c.Status, &c.IP, &c.UserAgent, &c.CreatedAt, &c.Source, &c.SourceID,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("get comment: %w", err)
+	}
+	if parentID.Valid {
+		v := parentID.Int64
+		c.ParentID = &v
+	}
+	return c, nil
+}
+
+// GetCommentBySource finds an imported comment by its origin id.
+func (s *SQLiteStore) GetCommentBySource(source, sourceID string) (*model.Comment, error) {
+	c := &model.Comment{}
+	var parentID sql.NullInt64
+	err := s.db.QueryRow(`
+		SELECT c.id, c.post_id, c.parent_id, c.author, c.email, c.url, c.content,
+		       c.status, c.ip, c.user_agent, c.created_at, c.source, c.source_id
+		FROM comments c WHERE c.source = ? AND c.source_id = ?`,
+		source, sourceID,
+	).Scan(
+		&c.ID, &c.PostID, &parentID, &c.Author, &c.Email, &c.URL, &c.Content,
+		&c.Status, &c.IP, &c.UserAgent, &c.CreatedAt, &c.Source, &c.SourceID,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get comment by source: %w", err)
 	}
 	if parentID.Valid {
 		v := parentID.Int64
@@ -66,7 +92,7 @@ func (s *SQLiteStore) ListComments(f CommentFilter) ([]*model.Comment, int, erro
 
 	rows, err := s.db.Query(`
 		SELECT c.id, c.post_id, c.parent_id, c.author, c.email, c.url, c.content,
-		       c.status, c.ip, c.user_agent, c.created_at,
+		       c.status, c.ip, c.user_agent, c.created_at, c.source, c.source_id,
 		       p.title, p.slug
 		FROM comments c
 		LEFT JOIN posts p ON p.id = c.post_id`+where+`
@@ -84,7 +110,8 @@ func (s *SQLiteStore) ListComments(f CommentFilter) ([]*model.Comment, int, erro
 		var postTitle, postSlug sql.NullString
 		if err := rows.Scan(
 			&c.ID, &c.PostID, &parentID, &c.Author, &c.Email, &c.URL, &c.Content,
-			&c.Status, &c.IP, &c.UserAgent, &c.CreatedAt, &postTitle, &postSlug,
+			&c.Status, &c.IP, &c.UserAgent, &c.CreatedAt, &c.Source, &c.SourceID,
+			&postTitle, &postSlug,
 		); err != nil {
 			return nil, 0, fmt.Errorf("scan comment: %w", err)
 		}
@@ -109,10 +136,11 @@ func (s *SQLiteStore) CreateComment(c *model.Comment) error {
 
 	res, err := s.db.Exec(`
 		INSERT INTO comments
-			(post_id, parent_id, author, email, url, content, status, ip, user_agent, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			(post_id, parent_id, author, email, url, content, status, ip, user_agent,
+			 created_at, source, source_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		c.PostID, c.ParentID, c.Author, c.Email, c.URL, c.Content,
-		c.Status, c.IP, c.UserAgent, c.CreatedAt,
+		c.Status, c.IP, c.UserAgent, c.CreatedAt, c.Source, c.SourceID,
 	)
 	if err != nil {
 		return fmt.Errorf("create comment: %w", err)

@@ -21,16 +21,26 @@ const (
 	StatusWaiting = "waiting"
 )
 
+// Content formats.
+const (
+	FormatMarkdown = "markdown"
+	FormatHTML     = "html"
+)
+
 // Post is a blog entry or an independent page.
 type Post struct {
-	ID       int64  `json:"id"`
-	Slug     string `json:"slug"`
-	Title    string `json:"title"`
-	Content  string `json:"content,omitempty"`
-	Excerpt  string `json:"excerpt"`
-	Cover    string `json:"cover,omitempty"`
-	Type     string `json:"type"`
-	Status   string `json:"status"`
+	ID      int64  `json:"id"`
+	Slug    string `json:"slug"`
+	Title   string `json:"title"`
+	Content string `json:"content,omitempty"`
+	Excerpt string `json:"excerpt"`
+	Cover   string `json:"cover,omitempty"`
+	Type    string `json:"type"`
+	Status  string `json:"status"`
+	// Format is "markdown" or "html". Imported Typecho posts may be raw HTML.
+	Format string `json:"format"`
+	// Template is the legacy Typecho page template name, kept for reference.
+	Template string `json:"template,omitempty"`
 	AuthorID *int64 `json:"author_id,omitempty"`
 	// Author is the display name resolved from the linked user, falling back
 	// to the site author option.
@@ -39,6 +49,7 @@ type Post struct {
 	AllowComment bool   `json:"allow_comment"`
 	Pinned       bool   `json:"pinned"`
 	Views        int64  `json:"views"`
+	Likes        int64  `json:"likes"`
 
 	PublishedAt *time.Time `json:"published_at,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
@@ -51,6 +62,11 @@ type Post struct {
 	// "leave relations unchanged" on update; an empty slice clears them.
 	CategoryIDs []int64 `json:"category_ids,omitempty"`
 	TagIDs      []int64 `json:"tag_ids,omitempty"`
+
+	// Source and SourceID identify imported content (for example Typecho
+	// cid values). They are internal and not exposed over JSON.
+	Source   string `json:"-"`
+	SourceID string `json:"-"`
 }
 
 // DisplayTime returns the time a post should be presented with: its
@@ -62,9 +78,23 @@ func (p *Post) DisplayTime() time.Time {
 	return p.CreatedAt
 }
 
-// IsPublished reports whether the post is publicly visible.
+// IsPublished reports whether the post has publish status.
 func (p *Post) IsPublished() bool {
 	return p.Status == StatusPublish
+}
+
+// PubliclyVisible reports whether an anonymous visitor may read the post.
+// Hidden posts are reachable by URL but omitted from listings; scheduled
+// posts become visible at their publication time.
+func (p *Post) PubliclyVisible(now time.Time) bool {
+	switch p.Status {
+	case StatusHidden:
+		return true
+	case StatusPublish:
+		return p.PublishedAt == nil || !p.PublishedAt.After(now)
+	default:
+		return false
+	}
 }
 
 var (

@@ -88,7 +88,7 @@ func GetPost(db store.Store) arry.Handler {
 			return
 		}
 
-		if !p.IsPublished() && !ctx.IsAuthed() {
+		if !p.PubliclyVisible(time.Now()) && !ctx.IsAuthed() {
 			jsonError(ctx, http.StatusNotFound, "post not found")
 			return
 		}

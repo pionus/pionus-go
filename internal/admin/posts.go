@@ -225,6 +225,8 @@ func (a *Admin) postInputFromForm(r *http.Request) (*content.PostInput, error) {
 		Cover:    strings.TrimSpace(r.PostFormValue("cover")),
 		Type:     r.PostFormValue("type"),
 		Status:   r.PostFormValue("status"),
+		Format:   r.PostFormValue("format"),
+		Template: r.PostFormValue("template"),
 		Password: r.PostFormValue("password"),
 	}
 
@@ -275,6 +277,8 @@ func postFromInput(in *content.PostInput) *model.Post {
 		Cover:       in.Cover,
 		Type:        in.Type,
 		Status:      in.Status,
+		Format:      in.Format,
+		Template:    in.Template,
 		PublishedAt: in.PublishedAt,
 	}
 	if in.AllowComment != nil {
@@ -288,6 +292,9 @@ func postFromInput(in *content.PostInput) *model.Post {
 	}
 	if p.Status == "" {
 		p.Status = model.StatusDraft
+	}
+	if p.Format == "" {
+		p.Format = model.FormatMarkdown
 	}
 	return p
 }

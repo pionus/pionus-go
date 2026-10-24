@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -15,6 +17,7 @@ import (
 	"github.com/pionus/pionus-go/internal/migrate"
 	"github.com/pionus/pionus-go/internal/model"
 	"github.com/pionus/pionus-go/internal/store"
+	"github.com/pionus/pionus-go/internal/typecho"
 )
 
 func main() {
@@ -23,12 +26,24 @@ func main() {
 	createAdmin := flag.String("create-admin", "", "create or reset an admin account with this username")
 	adminPassword := flag.String("admin-password", "", "password for -create-admin (or PIONUS_ADMIN_PASSWORD)")
 	adminEmail := flag.String("admin-email", "", "email for -create-admin")
+	importTypecho := flag.String("import-typecho", "", "import a Typecho JSON export produced by tools/typecho-export.php")
+	typechoUploads := flag.String("typecho-uploads", "", "path to the old Typecho usr/uploads directory")
+	typechoDryRun := flag.Bool("typecho-dry-run", false, "report what -import-typecho would do without writing")
+	typechoDrafts := flag.Bool("typecho-drafts", false, "also import Typecho post_draft autosave rows")
 	flag.Parse()
 
 	cfg, err := LoadConfig(*configPath)
 	if err != nil {
 		slog.Error("load config", "err", err)
 		os.Exit(1)
+	}
+	if cfg.Timezone != "" {
+		loc, err := time.LoadLocation(cfg.Timezone)
+		if err != nil {
+			slog.Error("load timezone", "timezone", cfg.Timezone, "err", err)
+			os.Exit(1)
+		}
+		time.Local = loc
 	}
 
 	db, err := store.NewSQLite(cfg.Database.Path)
@@ -51,6 +66,14 @@ func main() {
 	if *createAdmin != "" {
 		if err := upsertAdmin(db, *createAdmin, *adminPassword, *adminEmail); err != nil {
 			slog.Error("create admin", "err", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if *importTypecho != "" {
+		if err := runTypechoImport(db, *importTypecho, *typechoUploads, cfg.Upload.Dir, *typechoDryRun, *typechoDrafts); err != nil {
+			slog.Error("import typecho", "err", err)
 			os.Exit(1)
 		}
 		return
@@ -139,6 +162,9 @@ func main() {
 	api.Delete("/articles/:slug", handler.DeletePost(db))
 	router.Graft("/api", api)
 
+	// Legacy URL redirects (must be registered last; static routes win).
+	router.Get("/*", handler.Redirects(db))
+
 	// Admin area
 	adminArea := admin.New(admin.Options{
 		Store:       db,
@@ -161,6 +187,30 @@ func main() {
 			os.Exit(1)
 		}
 	}
+}
+
+// runTypechoImport imports a Typecho JSON export.
+func runTypechoImport(db store.Store, path, sourceUploads, destUploads string, dryRun, drafts bool) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("open export: %w", err)
+	}
+	defer f.Close()
+
+	report, err := typecho.Import(f, typecho.Options{
+		Store:         db,
+		SourceUploads: sourceUploads,
+		DestUploads:   destUploads,
+		DryRun:        dryRun,
+		ImportDrafts:  drafts,
+	})
+	if err != nil {
+		return err
+	}
+
+	out, _ := json.MarshalIndent(report, "", "  ")
+	fmt.Println(string(out))
+	return nil
 }
 
 // upsertAdmin creates an owner account or resets an existing user's password.

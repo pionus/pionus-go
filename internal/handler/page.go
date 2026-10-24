@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"html/template"
 	"log/slog"
 	"math"
 	"strconv"
@@ -114,11 +115,7 @@ func ArticleDetail(db store.Store) arry.Handler {
 		}
 
 		// Drafts and scheduled posts are only visible to authenticated users.
-		if !post.IsPublished() && !ctx.IsAuthed() {
-			ctx.Reply(404)
-			return
-		}
-		if post.PublishedAt != nil && post.PublishedAt.After(time.Now()) && !ctx.IsAuthed() {
+		if !post.PubliclyVisible(time.Now()) && !ctx.IsAuthed() {
 			ctx.Reply(404)
 			return
 		}
@@ -136,9 +133,14 @@ func ArticleDetail(db store.Store) arry.Handler {
 
 		_ = db.IncrementPostViews(slug)
 
+		rendered := content.RenderMarkdown(post.Content)
+		if post.Format == model.FormatHTML {
+			rendered = template.HTML(post.Content)
+		}
+
 		ctx.Render(200, "article.html", map[string]interface{}{
 			"Article":         post,
-			"RenderedContent": content.RenderMarkdown(post.Content),
+			"RenderedContent": rendered,
 			"ReadingTime":     readingTime,
 			"Prev":            prev,
 			"Next":            next,

@@ -26,4 +26,8 @@ type Comment struct {
 	// PostTitle and PostSlug are filled by admin listing queries.
 	PostTitle string `json:"post_title,omitempty"`
 	PostSlug  string `json:"post_slug,omitempty"`
+
+	// Source and SourceID identify imported comments.
+	Source   string `json:"-"`
+	SourceID string `json:"-"`
 }

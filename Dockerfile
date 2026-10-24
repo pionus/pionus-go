@@ -15,6 +15,7 @@ RUN apk add --no-cache ca-certificates tzdata \
     && mkdir -p /app/data /app/uploads /app/logs \
     && chown -R pionus:pionus /app
 
+ENV TZ=Asia/Shanghai
 WORKDIR /app
 COPY --from=builder /out/pionus ./pionus
 COPY --from=builder /src/config.yaml ./config.yaml

@@ -51,6 +51,7 @@ type PostFilter struct {
 type PostStore interface {
 	GetPost(slug string) (*model.Post, error)
 	GetPostByID(id int64) (*model.Post, error)
+	GetPostBySource(source, sourceID string) (*model.Post, error)
 	ListPosts(f PostFilter) ([]*model.Post, int, error)
 	// AdjacentPosts returns the newer (prev) and older (next) published posts.
 	AdjacentPosts(slug string) (prev, next *model.Post, err error)
@@ -94,6 +95,7 @@ type CommentFilter struct {
 // CommentStore manages post comments.
 type CommentStore interface {
 	GetComment(id int64) (*model.Comment, error)
+	GetCommentBySource(source, sourceID string) (*model.Comment, error)
 	ListComments(f CommentFilter) ([]*model.Comment, int, error)
 	CreateComment(c *model.Comment) error
 	UpdateCommentStatus(id int64, status string) error

@@ -79,9 +79,15 @@ pionus-go/
 │   │   └── templates/            # Server-rendered admin UI (go:embed)
 │   ├── handler/
 │   │   ├── post.go               # JSON API
-│   │   └── page.go               # SSR pages
-│   └── migrate/
-│       └── markdown.go           # Legacy markdown import
+│   │   ├── page.go               # SSR pages
+│   │   └── redirect.go           # Legacy URL catch-all
+│   ├── migrate/
+│   │   └── markdown.go           # Legacy markdown import
+│   └── typecho/                  # Typecho JSON importer
+│       ├── export.go
+│       └── import.go
+├── tools/
+│   └── typecho-export.php        # Read-only Typecho exporter
 ├── markdowns/                    # Legacy markdown files
 ├── uploads/                      # Uploaded media (runtime)
 ├── theme/                        # Frontend theme (git submodule)
@@ -97,6 +103,7 @@ pionus-go/
 server:
   addr: ":8087"
 theme: default
+timezone: "Asia/Shanghai"
 database:
   path: "./data/pionus.db"
 upload:
@@ -118,6 +125,7 @@ Environment overrides:
 | `PIONUS_AUTH_TOKEN` | Token for write API calls |
 | `PIONUS_ADDR` | Listen address |
 | `PIONUS_DB_PATH` | SQLite file path |
+| `PIONUS_TIMEZONE` | IANA timezone for timestamps |
 | `PIONUS_UPLOAD_DIR` | Upload directory |
 | `PIONUS_UPLOAD_MAX_MB` | Max upload size |
 | `PIONUS_SESSION_COOKIE` | Session cookie name |
@@ -250,6 +258,32 @@ The image runs as UID 10001 and uses `go.mod` (not `go.work`) to build. On
 first visit open `/admin/setup`, or create the owner from the CLI before
 starting the server.
 
+## Typecho Migration
+
+`tools/typecho-export.php` is a read-only exporter. Run it in the Typecho
+root, then import the JSON on the new host:
+
+```bash
+# old server
+TYPECHO_ROOT=/www/blog php typecho-export.php > typecho.json
+tar -C /www/blog/usr/uploads -czf uploads.tgz .
+
+# new host (dry run first)
+pionus -config config.yaml -import-typecho typecho.json \
+  -typecho-uploads /path/to/usr/uploads -typecho-dry-run
+pionus -config config.yaml -import-typecho typecho.json \
+  -typecho-uploads /path/to/usr/uploads
+
+# imported users have no password
+PIONUS_ADMIN_PASSWORD='new-password' pionus -config config.yaml -create-admin Secbone
+```
+
+The importer is idempotent (posts/comments are matched by `source` +
+`source_id`), preserves HTML vs Markdown (`posts.format`), imports categories,
+tags, multi-category relations, comments and views, copies attachments when
+available, and writes legacy URL redirects. Details and current gaps are in
+`tools/README.md`.
+
 ## Development Guidelines
 
 1. **New route**: handler in `internal/handler/` (public) or
@@ -258,7 +292,7 @@ starting the server.
    in `internal/content`, not duplicated between API and admin.
 3. **New storage method**: add to the relevant interface in `store.go`, then
    implement in the matching file; always update tests.
-4. **Schema change**: add `002_*.sql`; never edit an applied migration. The
+4. **Schema change**: add `003_*.sql`; never edit an applied migration. The
    runner records versions in `schema_migrations`.
 5. **Markdown**: render through `content.RenderMarkdown` so public pages,
    preview and future feeds stay consistent.
@@ -275,12 +309,15 @@ Done: schema, store layer, post API, SSR pages, markdown import, WAL, build,
 bcrypt login, sessions/CSRF, first-run setup, admin UI (dashboard, editor,
 media, taxonomies, comments, settings).
 
+Typecho migration is implemented: JSON export, idempotent import, HTML/Markdown
+preservation, taxonomies, comments, views, attachments and legacy post/page
+redirects.
+
 Pending for Typecho parity:
 
-1. Public comment submission, moderation notifications and spam protection.
-2. Typecho importer (`typecho_contents`/`metas`/`relationships`/`comments`/
-   `users`), `usr/uploads` migration and 301 redirect map.
-3. Permalinks matching Typecho (`/archives/:slug/`, `/category/:slug/`,
-   `/tag/:slug/`), feeds, sitemap, search.
-4. Theme rewrite in Go templates, including category/tag/archive pages.
-5. Draft preview links for anonymous reviewers.
+1. Public comment submission and rendering, moderation notifications and spam
+   protection.
+2. Category, tag and date archive pages, plus their 301 redirects.
+3. Feeds (`/feed/`), sitemap, search, Typecho-compatible permalinks.
+4. Theme rewrite in Go templates to match the old Typecho look.
+5. Password-protected post gating and draft preview links.

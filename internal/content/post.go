@@ -26,6 +26,8 @@ type PostInput struct {
 	Cover        string     `json:"cover"`
 	Type         string     `json:"type"`
 	Status       string     `json:"status"`
+	Format       string     `json:"format"`
+	Template     string     `json:"template"`
 	AuthorID     *int64     `json:"author_id"`
 	Password     string     `json:"password"`
 	AllowComment *bool      `json:"allow_comment"`
@@ -65,6 +67,8 @@ func (in *PostInput) Build(existing *model.Post) (*model.Post, error) {
 		Cover:        in.Cover,
 		Type:         in.Type,
 		Status:       in.Status,
+		Format:       in.Format,
+		Template:     in.Template,
 		AuthorID:     in.AuthorID,
 		PostPassword: in.Password,
 		CategoryIDs:  in.CategoryIDs,
@@ -86,6 +90,12 @@ func (in *PostInput) Build(existing *model.Post) (*model.Post, error) {
 		if p.Status == "" {
 			p.Status = existing.Status
 		}
+		if p.Format == "" {
+			p.Format = existing.Format
+		}
+		if p.Template == "" {
+			p.Template = existing.Template
+		}
 		if in.AuthorID != nil {
 			p.AuthorID = in.AuthorID
 		}
@@ -103,11 +113,17 @@ func (in *PostInput) Build(existing *model.Post) (*model.Post, error) {
 	if p.Status == "" {
 		p.Status = model.StatusDraft
 	}
+	if p.Format == "" {
+		p.Format = model.FormatMarkdown
+	}
 	if !ValidType(p.Type) {
 		return nil, fmt.Errorf("invalid post type")
 	}
 	if !ValidStatus(p.Status) {
 		return nil, fmt.Errorf("invalid post status")
+	}
+	if !ValidFormat(p.Format) {
+		return nil, fmt.Errorf("invalid content format")
 	}
 
 	if in.AllowComment != nil {
@@ -134,6 +150,11 @@ func (in *PostInput) Build(existing *model.Post) (*model.Post, error) {
 // ValidType reports whether t is a supported post type.
 func ValidType(t string) bool {
 	return t == model.PostTypePost || t == model.PostTypePage
+}
+
+// ValidFormat reports whether f is a supported content format.
+func ValidFormat(f string) bool {
+	return f == model.FormatMarkdown || f == model.FormatHTML
 }
 
 // ValidStatus reports whether s is a supported post status.

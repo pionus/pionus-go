@@ -65,12 +65,15 @@ func TestMigrationsAreIdempotent(t *testing.T) {
 	}
 	defer s2.Close()
 
-	var n int
-	if err := s2.db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&n); err != nil {
+	var rows, distinct int
+	if err := s2.db.QueryRow(`SELECT COUNT(*), COUNT(DISTINCT version) FROM schema_migrations`).Scan(&rows, &distinct); err != nil {
 		t.Fatal(err)
 	}
-	if n != 1 {
-		t.Fatalf("migrations applied %d times, want 1", n)
+	if rows != distinct {
+		t.Fatalf("migrations applied more than once: rows=%d distinct=%d", rows, distinct)
+	}
+	if distinct < 2 {
+		t.Fatalf("expected both migrations to be applied, got %d", distinct)
 	}
 }
 
