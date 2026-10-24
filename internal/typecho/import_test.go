@@ -43,7 +43,7 @@ func sampleExport() Export {
 		Contents: []Content{
 			{
 				CID: 10, Title: "HTML 文章", Created: 1325116801,
-				Text: "<p>Hello <b>HTML</b></p><img src=\"/usr/uploads/2015/03/a.jpg\"><img src=\"https://old.example/usr/uploads/2015/03/a.jpg\">", Type: "post", Status: "publish",
+				Text: "<p>Hello <b>HTML</b></p><img src=\"/usr/uploads/2015/03/a.jpg\"><img src=\"https://old.example/usr/uploads/2015/03/a.jpg\"><a href=\"http://old.example/index.php/archives/11/\">next</a><a href=\"/index.php/about.html\">about</a><a href=\"http://old.example/index.php/category/tech/\">cat</a>", Type: "post", Status: "publish",
 				AllowComment: "1", AuthorID: 1, Views: 7,
 			},
 			{
@@ -63,7 +63,7 @@ func sampleExport() Export {
 		},
 		Comments: []Comment{
 			{Coid: 1, CID: 10, Author: "A", Mail: "a@example.com", Text: "first", Status: "approved", Created: 1326000000},
-			{Coid: 2, CID: 10, Parent: 1, Author: "B", Text: "reply <img src=\"/usr/uploads/2015/03/a.jpg\">", Status: "waiting", Created: 1326000100},
+			{Coid: 2, CID: 10, Parent: 1, Author: "B", Text: "reply <img src=\"/usr/uploads/2015/03/a.jpg\"> <a href=\"http://old.example/index.php/archives/10/\">self</a>", Status: "waiting", Created: 1326000100},
 		},
 	}
 }
@@ -126,6 +126,11 @@ func TestImport(t *testing.T) {
 	if strings.Contains(htmlPost.Content, "/usr/uploads/") || strings.Count(htmlPost.Content, "/uploads/2015/03/a.jpg") != 2 {
 		t.Fatalf("asset paths were not rewritten: %q", htmlPost.Content)
 	}
+	for _, want := range []string{"/article/md-post", "/article/about", "/category/tech"} {
+		if !strings.Contains(htmlPost.Content, want) {
+			t.Fatalf("internal link %q was not rewritten: %q", want, htmlPost.Content)
+		}
+	}
 	if len(htmlPost.Categories) != 1 || htmlPost.Categories[0].Slug != "tech" {
 		t.Fatalf("categories = %+v", htmlPost.Categories)
 	}
@@ -175,15 +180,8 @@ func TestImport(t *testing.T) {
 	if strings.Contains(reply.Content, "/usr/uploads/") {
 		t.Fatalf("comment asset path not rewritten: %q", reply.Content)
 	}
-
-	for _, old := range []string{"/index.php/archives/10/", "/archives/10/", "/about.html"} {
-		r, err := db.FindRedirect(old)
-		if err != nil {
-			t.Fatalf("redirect %q: %v", old, err)
-		}
-		if r.To == "" || r.Status != 301 {
-			t.Fatalf("redirect %q = %+v", old, r)
-		}
+	if !strings.Contains(reply.Content, "/article/archives-10") {
+		t.Fatalf("comment post link not rewritten: %q", reply.Content)
 	}
 
 	if v, _ := db.GetOption("site.title"); v != "Old Blog" {

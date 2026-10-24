@@ -1,9 +1,9 @@
 # Pionus Go
 
-A self-hosted blog engine in Go, built on [arry](../arry) and SQLite. It is
-designed as a drop-in replacement for a Typecho blog: Typecho-compatible
-content semantics, a built-in admin UI, and a path for importing existing
-content and URLs.
+A self-hosted blog engine in Go, built on [arry](../arry) and SQLite. It is a
+Go replacement for a Typecho blog: compatible content semantics, a built-in
+admin UI, and an importer for existing posts, pages and comments. Old Typecho
+URLs are not preserved; imported content links are rewritten to the new routes.
 
 ## Features
 
@@ -45,11 +45,19 @@ TYPECHO_ROOT=/www/blog php typecho-export.php > typecho.json
 tar -C /www/blog/usr/uploads -czf uploads.tgz .
 
 # on the new host
-pionus -config config.yaml -import-typecho typecho.json -typecho-dry-run
-pionus -config config.yaml -import-typecho typecho.json -typecho-uploads ./uploads
-PIONUS_ADMIN_PASSWORD='new-password' pionus -config config.yaml -create-admin Secbone
+TYPECHO_EXPORT=typecho.json TYPECHO_UPLOADS=./old-usr-uploads \
+  ./scripts/migrate-typecho.sh --dry-run
+TYPECHO_EXPORT=typecho.json TYPECHO_UPLOADS=./old-usr-uploads \
+  ./scripts/migrate-typecho.sh
+PIONUS_ADMIN_PASSWORD='new-password' ./pionus -config config.yaml -create-admin Secbone
 ```
 
+The migration command runs import, link repair and image audit, and prints a
+JSON report. Re-run with `--skip-import` to repair links on an existing
+database.
+
+Old Typecho URLs are intentionally not redirected. Imported content internal
+links point at the new routes, so bookmarks to the old PHP addresses will 404.
 See `tools/README.md` for what is converted and the remaining gaps. To audit
 old images:
 
@@ -76,7 +84,7 @@ The project and the arry framework are developed together via `go.work`; see
 
 ## Status
 
-Implemented: content model, storage layer, public pages, JSON API, admin UI,
-authentication, uploads, markdown import. Next: Typecho data import and legacy
-URL redirects, public comments, Typecho-compatible permalinks, feeds and
-sitemap.
+Implemented: content model, storage layer, public pages, Paper & Ink theme,
+native comments, JSON API, admin UI, authentication, uploads, Typecho import,
+RSS/sitemap and image audit. Next: deploy, localize surviving legacy images and
+password-protected post gating.

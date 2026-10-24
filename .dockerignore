@@ -8,6 +8,10 @@ certs/
 *.db
 *.db-shm
 *.db-wal
+*.db.bak-*
+typecho.json
+typecho-*.json
+typecho.sql
 pionus
 pionus.pid
 .env

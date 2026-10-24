@@ -6,7 +6,8 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/pionus .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/pionus . \
+    && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/pionus-migrate ./cmd/pionus-migrate
 
 FROM alpine:3.22
 
@@ -18,6 +19,7 @@ RUN apk add --no-cache ca-certificates tzdata \
 ENV TZ=Asia/Shanghai
 WORKDIR /app
 COPY --from=builder /out/pionus ./pionus
+COPY --from=builder /out/pionus-migrate ./pionus-migrate
 COPY --from=builder /src/config.yaml ./config.yaml
 COPY --from=builder /src/markdowns ./markdowns
 

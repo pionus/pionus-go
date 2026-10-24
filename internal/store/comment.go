@@ -167,6 +167,18 @@ func (s *SQLiteStore) UpdateCommentStatus(id int64, status string) error {
 	return nil
 }
 
+func (s *SQLiteStore) UpdateCommentContent(id int64, content string) error {
+	res, err := s.db.Exec(`UPDATE comments SET content = ? WHERE id = ?`, content, id)
+	if err != nil {
+		return fmt.Errorf("update comment content %d: %w", id, err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *SQLiteStore) DeleteComment(id int64) error {
 	res, err := s.db.Exec(`DELETE FROM comments WHERE id = ?`, id)
 	if err != nil {

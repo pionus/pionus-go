@@ -4,7 +4,7 @@
 
 A self-hosted blog engine built with the custom **arry** web framework. It is
 being developed as a Go replacement for a Typecho (PHP) blog: same content
-semantics, old URLs kept alive with redirects, and no runtime dependencies
+semantics and no runtime dependencies
 beyond a single binary and SQLite.
 
 ## Tech Stack
@@ -43,16 +43,19 @@ logic belongs here.** Framework changes need tests in `../arry`.
 ```
 pionus-go/
 ├── main.go                       # Entry point, routing, middleware
-├── config.go                     # Config loader (YAML + env)
 ├── config.yaml
+├── cmd/
+│   └── pionus-migrate/           # Dedicated Typecho migration command
+├── scripts/
+│   └── migrate-typecho.sh        # One-shot migration wrapper
 ├── internal/
+│   ├── config/                   # Config loader (YAML + env)
 │   ├── model/                    # Domain types and constants
 │   │   ├── post.go               # Post, types/statuses, excerpt helpers
 │   │   ├── user.go               # User, roles
 │   │   ├── taxonomy.go           # Category, Tag, Slugify
 │   │   ├── comment.go
-│   │   ├── media.go              # Media, Session
-│   │   └── redirect.go
+│   │   └── media.go              # Media, Session
 │   ├── store/
 │   │   ├── store.go              # Store interfaces + filters + errors
 │   │   ├── sqlite.go             # Connection, WAL, migration runner
@@ -62,7 +65,7 @@ pionus-go/
 │   │   ├── comment.go
 │   │   ├── user.go
 │   │   ├── media.go
-│   │   └── option.go             # Options + redirects
+│   │   └── option.go             # Options
 │   ├── content/
 │   │   ├── post.go               # Shared post input validation
 │   │   ├── markdown.go           # Shared goldmark renderer
@@ -86,7 +89,7 @@ pionus-go/
 │   │   ├── comments.go           # Comment tree, submission, sanitizing
 │   │   ├── feed.go               # RSS, comments feed, sitemap, robots
 │   │   ├── site.go               # Shared public page data
-│   │   └── redirect.go           # Legacy URL catch-all
+│   │   └── notfound.go           # Themed 404 catch-all
 │   ├── migrate/
 │   │   └── markdown.go           # Legacy markdown import
 │   └── typecho/                  # Typecho JSON importer
@@ -195,7 +198,7 @@ Bootstrap without the browser:
 ### Public Pages
 
 The Paper & Ink theme is embedded in the binary and served from `web/theme`.
-Old Typecho URLs are handled by the redirect table.
+Old Typecho URLs are intentionally not supported; they return the themed 404.
 
 | Method | Path | Description |
 |---|---|---|
@@ -206,7 +209,7 @@ Old Typecho URLs are handled by the redirect table.
 | GET | `/category/:slug` | Category archive |
 | GET | `/tag/:slug` | Tag archive |
 | GET | `/archives/:year[/:month[/:day]]` | Date archives |
-| GET | `/search?q=` | Search (legacy `/search/:q` redirects) |
+| GET | `/search?q=` | Search |
 | GET | `/categories`, `/tags` | Taxonomy indexes |
 | GET | `/feed`, `/feed/comments` | RSS 2.0 feeds |
 | GET | `/sitemap.xml`, `/robots.txt` | SEO endpoints |
@@ -231,7 +234,6 @@ Old Typecho URLs are handled by the redirect table.
 | `media` | Uploaded files |
 | `sessions` | Server-side login sessions (SHA-256 token hash) |
 | `options` | Site settings |
-| `redirects` | Legacy URL → new URL mapping for SEO-preserving migration |
 | `schema_migrations` | Applied migration versions |
 
 Semantics:
@@ -246,7 +248,7 @@ Semantics:
 ## Store Interfaces
 
 `store.Store` composes focused interfaces: `PostStore`, `TaxonomyStore`,
-`CommentStore`, `UserStore`, `MediaStore`, `OptionStore`, `RedirectStore`.
+`CommentStore`, `UserStore`, `MediaStore`, `OptionStore`.
 Handlers depend on `store.Store`. Errors are matched with `errors.Is` against
 `store.ErrNotFound` and `store.ErrConflict`.
 
@@ -258,8 +260,11 @@ make build        # compile binary
 make start        # build + start in background
 make stop
 make restart
-make migrate      # import markdowns/ into SQLite (idempotent)
-go run . -audit-images            # report missing local images / external hosts
+make migrate          # import markdowns/ into SQLite (idempotent)
+make migrate-typecho  # Typecho import + link repair + image audit
+make migrate-links    # repair links / audit an existing database
+go run . -audit-images  # report missing local images / external hosts
+go run ./cmd/pionus-migrate -h  # dedicated migration command help
 make test
 make vet
 make fmt
@@ -274,35 +279,47 @@ docker run -p 8087:8087 -e PIONUS_AUTH_TOKEN=secret \
   -v "$PWD/data:/app/data" -v "$PWD/uploads:/app/uploads" pionus
 ```
 
-The image runs as UID 10001 and uses `go.mod` (not `go.work`) to build. On
-first visit open `/admin/setup`, or create the owner from the CLI before
-starting the server.
+The image runs as UID 10001 and uses `go.mod` (not `go.work`) to build. It
+contains both `pionus` and `pionus-migrate`. On first visit open `/admin/setup`,
+or create the owner from the CLI before starting the server. In the container:
+
+```bash
+docker exec -it <container> ./pionus-migrate -config config.yaml \
+  -export /tmp/typecho.json -source-uploads /tmp/usr/uploads
+```
 
 ## Typecho Migration
 
-`tools/typecho-export.php` is a read-only exporter. Run it in the Typecho
-root, then import the JSON on the new host:
+`tools/typecho-export.php` is a read-only exporter. The dedicated migration
+command performs import, link repair and image audit in one repeatable pass:
 
 ```bash
-# old server
+# old server (or a copy of the Typecho root)
 TYPECHO_ROOT=/www/blog php typecho-export.php > typecho.json
 tar -C /www/blog/usr/uploads -czf uploads.tgz .
 
-# new host (dry run first)
-pionus -config config.yaml -import-typecho typecho.json \
-  -typecho-uploads /path/to/usr/uploads -typecho-dry-run
-pionus -config config.yaml -import-typecho typecho.json \
-  -typecho-uploads /path/to/usr/uploads
+# new host: dry run first
+TYPECHO_EXPORT=typecho.json TYPECHO_UPLOADS=/path/to/usr/uploads \
+  ./scripts/migrate-typecho.sh --dry-run
+TYPECHO_EXPORT=typecho.json TYPECHO_UPLOADS=/path/to/usr/uploads \
+  ./scripts/migrate-typecho.sh
+
+# repair links / re-audit an existing database
+./scripts/migrate-typecho.sh --skip-import
 
 # imported users have no password
-PIONUS_ADMIN_PASSWORD='new-password' pionus -config config.yaml -create-admin Secbone
+PIONUS_ADMIN_PASSWORD='new-password' ./pionus -config config.yaml -create-admin Secbone
 ```
 
-The importer is idempotent (posts/comments are matched by `source` +
-`source_id`), preserves HTML vs Markdown (`posts.format`), imports categories,
-tags, multi-category relations, comments and views, copies attachments when
-available, and writes legacy URL redirects. Details and current gaps are in
-`tools/README.md`.
+The script wraps `go run ./cmd/pionus-migrate`, creates a timestamped SQLite
+backup before writing, and emits a JSON report with `import`, `links`, `images`
+and `verify` sections. Use `--skip-import` to repair links/audit an existing DB
+and `--dry-run` to preview. The importer is idempotent (posts and
+comments match on `source` + `source_id`), preserves HTML vs Markdown
+(`posts.format`), imports categories, tags, relations, comments and views, copies
+attachments when available, and rewrites old internal post/page/category/tag,
+upload and feed links to the new routes. Old Typecho URLs are intentionally not
+redirected. Details and current gaps are in `tools/README.md`.
 
 ## Development Guidelines
 
@@ -330,7 +347,7 @@ Done: schema, store layer, JSON API, Paper & Ink public theme (home, archives,
 post, TOC, code copy, KaTeX, responsive dark mode), native comments with
 moderation and sanitizing, search, RSS/comments feeds, sitemap, image fallback,
 embedded assets, and the Typecho importer with idempotent content, taxonomy,
-comment, attachment and legacy URL handling.
+comment and attachment handling. Old Typecho URLs intentionally return 404.
 
 Pending for full Typecho parity:
 

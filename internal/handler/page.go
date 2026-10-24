@@ -236,14 +236,6 @@ func Search(db store.Store) arry.Handler {
 	}
 }
 
-// LegacySearch redirects Typecho search URLs to the new query form.
-func LegacySearch(db store.Store) arry.Handler {
-	return func(ctx arry.Context) {
-		q := ctx.Param("q")
-		ctx.Redirect(http.StatusMovedPermanently, "/search?q="+url.QueryEscape(q))
-	}
-}
-
 func CategoriesPage(db store.Store) arry.Handler {
 	return func(ctx arry.Context) {
 		categories, err := db.ListCategories()

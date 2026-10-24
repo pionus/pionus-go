@@ -1,4 +1,4 @@
-.PHONY: dev build start stop restart migrate test vet fmt tidy docker audit audit-online
+.PHONY: dev build start stop restart migrate migrate-typecho migrate-links test vet fmt tidy docker audit audit-online
 
 OUTFILE=pionus
 PIDFILE=pionus.pid
@@ -22,6 +22,12 @@ restart: stop start
 
 migrate:
 	go run . -migrate
+
+migrate-typecho:
+	./scripts/migrate-typecho.sh
+
+migrate-links:
+	./scripts/migrate-typecho.sh --skip-import
 
 test:
 	go test ./...

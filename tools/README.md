@@ -24,27 +24,43 @@ tar -C /www/blog/usr/uploads -czf uploads.tgz .
 ## 2. Dry run on the new server
 
 ```bash
-pionus \
-  -config config.yaml \
-  -import-typecho typecho.json \
-  -typecho-uploads /path/to/old/usr/uploads \
-  -typecho-dry-run
+TYPECHO_EXPORT=typecho.json \
+TYPECHO_UPLOADS=/path/to/old/usr/uploads \
+  ./scripts/migrate-typecho.sh --dry-run
 ```
 
-This prints counts, missing attachments and warnings without writing.
+This imports nothing, repairs nothing and audits nothing; it prints the
+counts and warnings that a real run would produce.
 
-## 3. Import
+## 3. Import, repair links and audit
 
 ```bash
-pionus \
-  -config config.yaml \
-  -import-typecho typecho.json \
-  -typecho-uploads /path/to/old/usr/uploads
+TYPECHO_EXPORT=typecho.json \
+TYPECHO_UPLOADS=/path/to/old/usr/uploads \
+  ./scripts/migrate-typecho.sh
 ```
 
+The wrapper runs `go run ./cmd/pionus-migrate`, which:
+1. backs up the SQLite database (unless `--dry-run`),
+2. imports the JSON and attachments,
+3. rewrites old internal links in posts and comments,
+4. audits image references,
+5. verifies counts and prints a JSON report.
+
+Run just the repair/audit stages on an existing database:
+
+```bash
+./scripts/migrate-typecho.sh --skip-import
+./scripts/migrate-typecho.sh --skip-import --dry-run
+```
+
+Useful flags: `--drafts`, `--online-audit`, `--skip-links`, `--skip-images`,
+`--backup=false` and `--dry-run`. The JSON report contains `import`, `links`,
+`images` and `verify` sections.
+
 The importer is idempotent: posts and comments are matched by their Typecho
-ID (`source = typecho`), taxonomies by slug, and redirects are upserted.
-Re-running updates posts instead of duplicating them.
+ID (`source = typecho`) and taxonomies by slug. Re-running updates posts
+instead of duplicating them.
 
 Typecho users are imported with no usable password. Reset the owner account:
 
@@ -60,14 +76,17 @@ PIONUS_ADMIN_PASSWORD='new-password' pionus -config config.yaml -create-admin Se
 - Slugs keep Typecho's value when present; otherwise posts get
   `archives-<cid>` and pages get `page-<cid>`.
 - `/usr/uploads/` links are rewritten to `/uploads/` in post and comment text.
-- Old URLs are inserted into `redirects`:
-  - posts: `/index.php/archives/<cid>/` and `/archives/<cid>/`
-  - pages: `/index.php/<slug>.html` and `/<slug>.html`
-  - categories/tags, including pagination
-  - date archives (`/Y/`, `/Y/M/`, `/Y/M/D/`)
-  - feeds, `/blog/`, `/page/N/` and `/index.php`
+- Internal links to old post/page/category/tag URLs are rewritten to the new
+  routes (`/article/<slug>`, `/category/<slug>`, `/tag/<slug>`).
 - Attachments are copied to `upload.dir` and recorded in `media` when the
   source file exists.
+
+Old Typecho URLs are deliberately not redirected: `/index.php/...`,
+`/<slug>.html`, `/2015/03/` and similar addresses return the new site's 404.
+Bookmarks and external links to those addresses will break by design.
+
+If the new site lives on a different domain, update `site.url` in the admin
+settings after importing; feeds and the sitemap use it.
 
 ## Image audit
 
@@ -86,7 +105,7 @@ keeps a link to the original.
 ## Known gaps
 
 - Typecho `post_draft` autosave revisions are skipped by default. Pass
-  `-typecho-drafts` to import them as drafts.
+  `-drafts` to import them as drafts.
 - Password-protected posts are stored but password gating is not implemented.
 - The old server's `usr/uploads` directory was empty; three attachment files
   are missing unless another backup exists.

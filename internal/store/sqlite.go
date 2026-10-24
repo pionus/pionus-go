@@ -61,6 +61,15 @@ func (s *SQLiteStore) Close() error {
 	return s.db.Close()
 }
 
+// Backup writes a consistent snapshot to path using VACUUM INTO.
+func (s *SQLiteStore) Backup(path string) error {
+	quoted := strings.ReplaceAll(path, "'", "''")
+	if _, err := s.db.Exec("VACUUM INTO '" + quoted + "'"); err != nil {
+		return fmt.Errorf("backup database: %w", err)
+	}
+	return nil
+}
+
 func (s *SQLiteStore) migrate() error {
 	if _, err := s.db.Exec(`
 		CREATE TABLE IF NOT EXISTS schema_migrations (

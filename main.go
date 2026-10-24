@@ -13,12 +13,12 @@ import (
 	"github.com/pionus/arry/middlewares"
 	"github.com/pionus/pionus-go/internal/admin"
 	"github.com/pionus/pionus-go/internal/auth"
+	"github.com/pionus/pionus-go/internal/config"
 	"github.com/pionus/pionus-go/internal/handler"
 	"github.com/pionus/pionus-go/internal/imageaudit"
 	"github.com/pionus/pionus-go/internal/migrate"
 	"github.com/pionus/pionus-go/internal/model"
 	"github.com/pionus/pionus-go/internal/store"
-	"github.com/pionus/pionus-go/internal/typecho"
 	"github.com/pionus/pionus-go/web"
 )
 
@@ -28,15 +28,11 @@ func main() {
 	createAdmin := flag.String("create-admin", "", "create or reset an admin account with this username")
 	adminPassword := flag.String("admin-password", "", "password for -create-admin (or PIONUS_ADMIN_PASSWORD)")
 	adminEmail := flag.String("admin-email", "", "email for -create-admin")
-	importTypecho := flag.String("import-typecho", "", "import a Typecho JSON export produced by tools/typecho-export.php")
-	typechoUploads := flag.String("typecho-uploads", "", "path to the old Typecho usr/uploads directory")
-	typechoDryRun := flag.Bool("typecho-dry-run", false, "report what -import-typecho would do without writing")
-	typechoDrafts := flag.Bool("typecho-drafts", false, "also import Typecho post_draft autosave rows")
 	auditImages := flag.Bool("audit-images", false, "report missing local images and external image hosts")
 	auditOnline := flag.Bool("audit-images-online", false, "also check external image URLs while auditing")
 	flag.Parse()
 
-	cfg, err := LoadConfig(*configPath)
+	cfg, err := config.Load(*configPath)
 	if err != nil {
 		slog.Error("load config", "err", err)
 		os.Exit(1)
@@ -70,14 +66,6 @@ func main() {
 	if *createAdmin != "" {
 		if err := upsertAdmin(db, *createAdmin, *adminPassword, *adminEmail); err != nil {
 			slog.Error("create admin", "err", err)
-			os.Exit(1)
-		}
-		return
-	}
-
-	if *importTypecho != "" {
-		if err := runTypechoImport(db, *importTypecho, *typechoUploads, cfg.Upload.Dir, *typechoDryRun, *typechoDrafts); err != nil {
-			slog.Error("import typecho", "err", err)
 			os.Exit(1)
 		}
 		return
@@ -158,11 +146,7 @@ func main() {
 	router.Get("/archives/:year", handler.DateArchive(db))
 	router.Get("/archives/:year/:month", handler.DateArchive(db))
 	router.Get("/archives/:year/:month/:day", handler.DateArchive(db))
-	router.Get("/index.php", handler.LegacyHome)
-	router.Get("/index.php/", handler.LegacyHome)
 	router.Get("/search", handler.Search(db))
-	router.Get("/search/:q", handler.LegacySearch(db))
-	router.Get("/index.php/search/:q", handler.LegacySearch(db))
 	router.Get("/categories", handler.CategoriesPage(db))
 	router.Get("/tags", handler.TagsPage(db))
 	router.Get("/feed", handler.Feed(db))
@@ -201,8 +185,8 @@ func main() {
 	api.Delete("/articles/:slug", handler.DeletePost(db))
 	router.Graft("/api", api)
 
-	// Legacy URL redirects (must be registered last; static routes win).
-	router.Get("/*", handler.Redirects(db))
+	// Themed 404 for unmatched paths (must be registered last).
+	router.Get("/*", handler.NotFound(db))
 
 	// Admin area
 	adminArea := admin.New(admin.Options{
@@ -226,30 +210,6 @@ func main() {
 			os.Exit(1)
 		}
 	}
-}
-
-// runTypechoImport imports a Typecho JSON export.
-func runTypechoImport(db store.Store, path, sourceUploads, destUploads string, dryRun, drafts bool) error {
-	f, err := os.Open(path)
-	if err != nil {
-		return fmt.Errorf("open export: %w", err)
-	}
-	defer f.Close()
-
-	report, err := typecho.Import(f, typecho.Options{
-		Store:         db,
-		SourceUploads: sourceUploads,
-		DestUploads:   destUploads,
-		DryRun:        dryRun,
-		ImportDrafts:  drafts,
-	})
-	if err != nil {
-		return err
-	}
-
-	out, _ := json.MarshalIndent(report, "", "  ")
-	fmt.Println(string(out))
-	return nil
 }
 
 // upsertAdmin creates an owner account or resets an existing user's password.

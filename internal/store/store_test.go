@@ -327,7 +327,7 @@ func TestUsersAndSessions(t *testing.T) {
 	}
 }
 
-func TestMediaAndRedirects(t *testing.T) {
+func TestMedia(t *testing.T) {
 	s := newTestStore(t)
 
 	m := &model.Media{Path: "2026/10/pic.png", Filename: "pic.png", MIME: "image/png", Size: 42}
@@ -337,17 +337,6 @@ func TestMediaAndRedirects(t *testing.T) {
 	list, total, err := s.ListMedia(1, 10)
 	if err != nil || total != 1 || len(list) != 1 {
 		t.Fatalf("media total=%d len=%d err=%v", total, len(list), err)
-	}
-
-	if err := s.SetRedirect("/archives/1/", "/article/hello/", 301); err != nil {
-		t.Fatal(err)
-	}
-	r, err := s.FindRedirect("/archives/1/")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if r.To != "/article/hello/" || r.Status != 301 {
-		t.Fatalf("redirect = %+v", r)
 	}
 }
 

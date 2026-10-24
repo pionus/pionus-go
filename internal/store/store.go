@@ -21,7 +21,6 @@ type Store interface {
 	UserStore
 	MediaStore
 	OptionStore
-	RedirectStore
 	Close() error
 }
 
@@ -60,6 +59,9 @@ type PostStore interface {
 	AdjacentPosts(slug string) (prev, next *model.Post, err error)
 	CreatePost(p *model.Post) error
 	UpdatePost(slug string, p *model.Post) error
+	// UpdatePostContent rewrites the body without touching timestamps or
+	// relations. It is used by migration link repair.
+	UpdatePostContent(id int64, content, excerpt string) error
 	DeletePost(slug string) error
 	IncrementPostViews(slug string) error
 }
@@ -102,6 +104,8 @@ type CommentStore interface {
 	ListComments(f CommentFilter) ([]*model.Comment, int, error)
 	CreateComment(c *model.Comment) error
 	UpdateCommentStatus(id int64, status string) error
+	// UpdateCommentContent rewrites a comment body for migration link repair.
+	UpdateCommentContent(id int64, content string) error
 	DeleteComment(id int64) error
 	CountComments(postID int64, status string) (int, error)
 }
@@ -138,11 +142,4 @@ type OptionStore interface {
 	GetOption(name string) (string, error)
 	SetOption(name, value string) error
 	AllOptions() (map[string]string, error)
-}
-
-// RedirectStore stores legacy URL redirects.
-type RedirectStore interface {
-	SetRedirect(from, to string, status int) error
-	FindRedirect(from string) (*model.Redirect, error)
-	ListRedirects() ([]*model.Redirect, error)
 }

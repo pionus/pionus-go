@@ -1,4 +1,5 @@
-package main
+// Package config loads pionus configuration from YAML and environment.
+package config
 
 import (
 	"fmt"
@@ -44,7 +45,7 @@ type Config struct {
 	AuthToken string         `yaml:"-"`
 }
 
-func LoadConfig(path string) (*Config, error) {
+func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read config file: %w", err)

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -45,7 +44,6 @@ type Report struct {
 	Posts              int      `json:"posts"`
 	Pages              int      `json:"pages"`
 	Comments           int      `json:"comments"`
-	Redirects          int      `json:"redirects"`
 	Attachments        int      `json:"attachments"`
 	Updated            int      `json:"updated"`
 	SkippedDrafts      int      `json:"skipped_drafts"`
@@ -68,6 +66,9 @@ type importer struct {
 
 	postCats map[int64][]int64
 	postTags map[int64][]int64
+
+	slugByCID map[int64]string
+	linker    *LinkFixer
 }
 
 // Import reads a Typecho export and writes it to the configured store.
@@ -97,6 +98,8 @@ func Import(reader io.Reader, opts Options) (*Report, error) {
 		commentIDs: make(map[int64]int64),
 		postCats:   make(map[int64][]int64),
 		postTags:   make(map[int64][]int64),
+		slugByCID:  make(map[int64]string),
+		linker:     NewLinkFixer(ex.Site.URL),
 	}
 
 	if opts.DryRun {
@@ -110,13 +113,13 @@ func Import(reader io.Reader, opts Options) (*Report, error) {
 		return nil, err
 	}
 	im.buildRelations()
+	if err := im.prepareSlugs(); err != nil {
+		return nil, err
+	}
 	if err := im.importContents(); err != nil {
 		return nil, err
 	}
 	if err := im.importComments(); err != nil {
-		return nil, err
-	}
-	if err := im.importRedirects(); err != nil {
 		return nil, err
 	}
 	if err := im.applySiteOptions(); err != nil {
@@ -159,8 +162,6 @@ func (im *importer) dryRun() (*Report, error) {
 		}
 	}
 	im.report.Comments = len(im.ex.Comments)
-	// Every post/page gets its old URL variants; this is a lower bound.
-	im.report.Redirects = (im.report.Posts + im.report.Pages) * 4
 	im.report.Warnings = append(im.report.Warnings, "dry run: nothing was written")
 	return im.report, nil
 }
@@ -341,7 +342,7 @@ func (im *importer) importContents() error {
 
 func (im *importer) importContent(c Content) error {
 	format, text := parseContentText(c.Text)
-	text = im.rewriteAssetPaths(text)
+	text = im.linker.Rewrite(text)
 	status := mapStatus(c.Status)
 	postType := model.PostTypePost
 	if c.Type == model.PostTypePage {
@@ -359,13 +360,12 @@ func (im *importer) importContent(c Content) error {
 
 	sourceID := strconv.FormatInt(c.CID, 10)
 	existing, err := im.opts.Store.GetPostBySource(Source, sourceID)
-	slug := ""
-	if err == nil {
-		slug = existing.Slug
-	} else if !errors.Is(err, store.ErrNotFound) {
-		return fmt.Errorf("lookup typecho post %d: %w", c.CID, err)
-	} else {
+	slug := im.slugByCID[c.CID]
+	if slug == "" {
 		slug = im.uniqueSlug(c)
+	}
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return fmt.Errorf("lookup typecho post %d: %w", c.CID, err)
 	}
 
 	p := &model.Post{
@@ -419,13 +419,6 @@ func (im *importer) importContent(c Content) error {
 		}
 	}
 	im.postIDs[c.CID] = p.ID
-
-	for _, oldPath := range oldPaths(c) {
-		if err := im.opts.Store.SetRedirect(oldPath, "/article/"+p.Slug, 301); err != nil {
-			return fmt.Errorf("redirect %q: %w", oldPath, err)
-		}
-		im.report.Redirects++
-	}
 	return nil
 }
 
@@ -521,7 +514,7 @@ func (im *importer) importComment(c Comment) error {
 		Author:    c.Author,
 		Email:     c.Mail,
 		URL:       c.URL,
-		Content:   im.rewriteAssetPaths(c.Text),
+		Content:   im.linker.Rewrite(c.Text),
 		Status:    mapCommentStatus(c.Status),
 		IP:        c.IP,
 		UserAgent: c.Agent,
@@ -539,170 +532,6 @@ func (im *importer) importComment(c Comment) error {
 	}
 	im.commentIDs[c.Coid] = comment.ID
 	im.report.Comments++
-	return nil
-}
-
-func (im *importer) importRedirects() error {
-	add := func(from, to string) error {
-		if from == "" || from == to {
-			return nil
-		}
-		if err := im.opts.Store.SetRedirect(from, to, 301); err != nil {
-			return err
-		}
-		im.report.Redirects++
-		return nil
-	}
-
-	// Old home and archive index.
-	for _, oldPath := range []string{"/index.php", "/index.php/"} {
-		if err := add(oldPath, "/"); err != nil {
-			return err
-		}
-	}
-	for _, oldPath := range []string{"/blog/", "/blog", "/index.php/blog/", "/index.php/blog"} {
-		if err := add(oldPath, "/article"); err != nil {
-			return err
-		}
-	}
-	// Feeds.
-	for _, oldPath := range []string{
-		"/index.php/feed/", "/index.php/feed", "/feed/",
-		"/index.php/feed/atom/", "/index.php/feed/atom", "/feed/atom/", "/feed/atom",
-	} {
-		if err := add(oldPath, "/feed"); err != nil {
-			return err
-		}
-	}
-	for _, oldPath := range []string{
-		"/index.php/feed/comments/", "/index.php/feed/comments",
-		"/feed/comments/", "/feed/comments",
-	} {
-		if err := add(oldPath, "/feed/comments"); err != nil {
-			return err
-		}
-	}
-
-	pageSize := im.ex.Site.PageSize
-	if pageSize <= 0 {
-		pageSize = 10
-	}
-	postCount := 0
-	for _, c := range im.ex.Contents {
-		if c.Type == "post" && c.Status == "publish" {
-			postCount++
-		}
-	}
-	for page := 2; page <= (postCount+pageSize-1)/pageSize && page <= 100; page++ {
-		n := strconv.Itoa(page)
-		for _, oldPath := range []string{"/page/" + n + "/", "/index.php/page/" + n + "/", "/blog/page/" + n + "/", "/index.php/blog/page/" + n + "/"} {
-			if err := add(oldPath, "/article?page="+n); err != nil {
-				return err
-			}
-		}
-	}
-
-	// Categories and tags, including Typecho's /slug/{page}/ pagination.
-	for _, m := range im.ex.Metas {
-		slug := strings.TrimSpace(m.Slug)
-		if slug == "" {
-			continue
-		}
-		var base string
-		switch m.Type {
-		case "category":
-			base = "/category/" + slug
-		case "tag":
-			base = "/tag/" + slug
-		default:
-			continue
-		}
-
-		for _, oldPath := range []string{
-			"/index.php" + base + "/",
-			"/index.php" + base,
-			base + "/",
-		} {
-			if err := add(oldPath, base); err != nil {
-				return err
-			}
-		}
-
-		maxPage := (m.Count + pageSize - 1) / pageSize
-		if maxPage > 100 {
-			maxPage = 100
-		}
-		for page := 2; page <= maxPage; page++ {
-			n := strconv.Itoa(page)
-			for _, oldPath := range []string{
-				"/index.php" + base + "/" + n + "/",
-				base + "/" + n + "/",
-			} {
-				if err := add(oldPath, base+"?page="+n); err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	// Date archives. Typecho's routes are /Y/, /Y/M/ and /Y/M/D/.
-	years := make(map[int]bool)
-	months := make(map[string]bool)
-	days := make(map[string]bool)
-	for _, c := range im.ex.Contents {
-		if c.Created == 0 || (c.Type != "post" && c.Type != "page") {
-			continue
-		}
-		t := im.wallTime(c.Created)
-		years[t.Year()] = true
-		months[t.Format("2006/01")] = true
-		days[t.Format("2006/01/02")] = true
-	}
-
-	for year := range years {
-		y := strconv.Itoa(year)
-		for _, oldPath := range []string{"/" + y + "/", "/index.php/" + y + "/"} {
-			if err := add(oldPath, "/archives/"+y); err != nil {
-				return err
-			}
-		}
-		maxPage := postCount/pageSize + 1
-		if maxPage > 100 {
-			maxPage = 100
-		}
-		for page := 2; page <= maxPage; page++ {
-			n := strconv.Itoa(page)
-			for _, oldPath := range []string{"/" + y + "/page/" + n + "/", "/index.php/" + y + "/page/" + n + "/"} {
-				if err := add(oldPath, "/archives/"+y+"?page="+n); err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	for month := range months {
-		for _, oldPath := range []string{"/" + month + "/", "/index.php/" + month + "/"} {
-			if err := add(oldPath, "/archives/"+month); err != nil {
-				return err
-			}
-		}
-	}
-
-	for day := range days {
-		for _, oldPath := range []string{"/" + day + "/", "/index.php/" + day + "/"} {
-			if err := add(oldPath, "/archives/"+day); err != nil {
-				return err
-			}
-		}
-	}
-
-	// Author archive.
-	for _, oldPath := range []string{"/author/1/", "/index.php/author/1/"} {
-		if err := add(oldPath, "/article"); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -872,17 +701,34 @@ func copyFile(src, dst string) error {
 	return out.Close()
 }
 
-// rewriteAssetPaths points old /usr/uploads URLs at the new /uploads route,
-// including absolute links that mention the old host.
-func (im *importer) rewriteAssetPaths(text string) string {
-	if text == "" {
-		return text
+// prepareSlugs resolves every imported post/page slug before writing content so
+// old internal links can be rewritten to the new canonical URLs.
+func (im *importer) prepareSlugs() error {
+	for _, c := range im.ex.Contents {
+		if c.Type != "post" && c.Type != "page" && c.Type != "post_draft" {
+			continue
+		}
+		sourceID := strconv.FormatInt(c.CID, 10)
+		existing, err := im.opts.Store.GetPostBySource(Source, sourceID)
+		if err == nil {
+			im.slugByCID[c.CID] = existing.Slug
+			if c.Type == "page" {
+				im.linker.SetPageSlug(c.Slug, existing.Slug)
+			}
+			im.linker.SetPostSlug(c.CID, existing.Slug)
+			continue
+		}
+		if !errors.Is(err, store.ErrNotFound) {
+			return fmt.Errorf("lookup typecho post %d: %w", c.CID, err)
+		}
+		slug := im.uniqueSlug(c)
+		im.slugByCID[c.CID] = slug
+		im.linker.SetPostSlug(c.CID, slug)
+		if c.Type == "page" && c.Slug != "" {
+			im.linker.SetPageSlug(c.Slug, slug)
+		}
 	}
-	if u, err := url.Parse(im.ex.Site.URL); err == nil && u.Host != "" {
-		text = strings.ReplaceAll(text, "http://"+u.Host+"/usr/uploads/", "/uploads/")
-		text = strings.ReplaceAll(text, "https://"+u.Host+"/usr/uploads/", "/uploads/")
-	}
-	return strings.ReplaceAll(text, "/usr/uploads/", "/uploads/")
+	return nil
 }
 
 func parseContentText(text string) (format, body string) {
@@ -929,27 +775,6 @@ func allowComment(v string) bool {
 		return false
 	}
 	return true
-}
-
-func oldPaths(c Content) []string {
-	if c.Type == "page" {
-		slug := c.Slug
-		if slug == "" {
-			return nil
-		}
-		return []string{
-			"/" + slug + ".html",
-			"/index.php/" + slug + ".html",
-		}
-	}
-
-	cid := strconv.FormatInt(c.CID, 10)
-	return []string{
-		"/archives/" + cid + "/",
-		"/archives/" + cid,
-		"/index.php/archives/" + cid + "/",
-		"/index.php/archives/" + cid,
-	}
 }
 
 func appendUnique(ids []int64, id int64) []int64 {

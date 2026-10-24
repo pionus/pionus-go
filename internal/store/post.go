@@ -391,6 +391,21 @@ func (s *SQLiteStore) UpdatePost(slug string, p *model.Post) error {
 	return nil
 }
 
+func (s *SQLiteStore) UpdatePostContent(id int64, content, excerpt string) error {
+	res, err := s.db.Exec(
+		`UPDATE posts SET content = ?, excerpt = ? WHERE id = ?`,
+		content, excerpt, id,
+	)
+	if err != nil {
+		return fmt.Errorf("update post content %d: %w", id, err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *SQLiteStore) DeletePost(slug string) error {
 	res, err := s.db.Exec(`DELETE FROM posts WHERE slug = ?`, slug)
 	if err != nil {

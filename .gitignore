@@ -15,3 +15,8 @@ uploads/
 certs/
 
 .playwright-mcp/
+
+typecho.json
+typecho-*.json
+typecho.sql
+*.db.bak-*
