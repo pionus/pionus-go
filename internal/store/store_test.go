@@ -54,6 +54,19 @@ func TestOptionsSeeded(t *testing.T) {
 	}
 }
 
+func TestOptionsCacheInvalidates(t *testing.T) {
+	s := newTestStore(t)
+	if v, _ := s.GetOption("site.title"); v != "Secbone's Blog" {
+		t.Fatalf("initial title = %q", v)
+	}
+	if err := s.SetOption("site.title", "New Title"); err != nil {
+		t.Fatal(err)
+	}
+	if v, _ := s.GetOption("site.title"); v != "New Title" {
+		t.Fatalf("cached title = %q", v)
+	}
+}
+
 func TestMigrationsAreIdempotent(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.db")

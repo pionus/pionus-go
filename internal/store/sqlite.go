@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -21,6 +22,10 @@ var migrationsFS embed.FS
 // SQLiteStore is the SQLite-backed implementation of Store.
 type SQLiteStore struct {
 	db *sql.DB
+
+	optionsMu     sync.RWMutex
+	options       map[string]string
+	optionsLoaded bool
 }
 
 // NewSQLite opens (creating when needed) the database at dbPath and applies
