@@ -26,6 +26,7 @@ type RenderedPost struct {
 	HTML    template.HTML
 	TOC     []TOCItem
 	HasMath bool
+	HasCode bool
 }
 
 var postMarkdown = goldmark.New(
@@ -54,6 +55,7 @@ func RenderPost(p *model.Post) RenderedPost {
 		HTML:    template.HTML(normalized),
 		TOC:     toc,
 		HasMath: hasMath(p.Content),
+		HasCode: strings.Contains(normalized, "<pre"),
 	}
 }
 

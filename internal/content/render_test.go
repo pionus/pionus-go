@@ -26,6 +26,9 @@ func TestRenderMarkdownPost(t *testing.T) {
 	if !got.HasMath {
 		t.Fatal("math was not detected")
 	}
+	if !got.HasCode {
+		t.Fatal("code was not detected")
+	}
 	if !strings.Contains(string(got.HTML), `class="language-go"`) {
 		t.Fatalf("code fence lost language: %s", got.HTML)
 	}
