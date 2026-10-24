@@ -146,6 +146,13 @@ func TestPostLifecycle(t *testing.T) {
 	if list[0].Content != "" {
 		t.Fatal("list should not load content by default")
 	}
+	listWithTaxonomy, _, err := s.ListPosts(PostFilter{WithTaxonomy: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listWithTaxonomy[0].Categories) != 1 || len(listWithTaxonomy[0].Tags) != 1 {
+		t.Fatalf("batch taxonomy = %+v", listWithTaxonomy[0])
+	}
 
 	byTag, _, err := s.ListPosts(PostFilter{TagSlug: "sqlite"})
 	if err != nil {

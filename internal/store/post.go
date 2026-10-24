@@ -161,13 +161,21 @@ func (s *SQLiteStore) ListPosts(f PostFilter) ([]*model.Post, int, error) {
 	}
 
 	if f.WithTaxonomy {
+		ids := make([]int64, 0, len(posts))
 		for _, p := range posts {
-			if p.Categories, err = s.PostCategories(p.ID); err != nil {
-				return nil, 0, err
-			}
-			if p.Tags, err = s.PostTags(p.ID); err != nil {
-				return nil, 0, err
-			}
+			ids = append(ids, p.ID)
+		}
+		categories, err := s.postCategoriesBatch(ids)
+		if err != nil {
+			return nil, 0, err
+		}
+		tags, err := s.postTagsBatch(ids)
+		if err != nil {
+			return nil, 0, err
+		}
+		for _, p := range posts {
+			p.Categories = categories[p.ID]
+			p.Tags = tags[p.ID]
 		}
 	}
 

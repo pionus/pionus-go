@@ -247,6 +247,81 @@ func (s *SQLiteStore) SetPostTags(postID int64, tagIDs []int64) error {
 	return replacePostTags(s.db, postID, tagIDs)
 }
 
+func (s *SQLiteStore) postCategoriesBatch(ids []int64) (map[int64][]*model.Category, error) {
+	out := make(map[int64][]*model.Category, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	placeholders := make([]string, len(ids))
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	rows, err := s.db.Query(`
+		SELECT pc.post_id, c.id, c.name, c.slug, c.description, c.parent_id,
+		       c.sort_order, c.created_at,
+		       (SELECT COUNT(*) FROM post_categories pc2 WHERE pc2.category_id = c.id) AS post_count
+		FROM post_categories pc
+		JOIN categories c ON c.id = pc.category_id
+		WHERE pc.post_id IN (`+strings.Join(placeholders, ",")+`)
+		ORDER BY pc.post_id, c.sort_order ASC, c.name ASC`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("batch post categories: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var postID int64
+		c := &model.Category{}
+		var parentID sql.NullInt64
+		if err := rows.Scan(&postID, &c.ID, &c.Name, &c.Slug, &c.Description, &parentID,
+			&c.SortOrder, &c.CreatedAt, &c.PostCount); err != nil {
+			return nil, fmt.Errorf("scan batch category: %w", err)
+		}
+		if parentID.Valid {
+			v := parentID.Int64
+			c.ParentID = &v
+		}
+		out[postID] = append(out[postID], c)
+	}
+	return out, rows.Err()
+}
+
+func (s *SQLiteStore) postTagsBatch(ids []int64) (map[int64][]*model.Tag, error) {
+	out := make(map[int64][]*model.Tag, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	placeholders := make([]string, len(ids))
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	rows, err := s.db.Query(`
+		SELECT pt.post_id, t.id, t.name, t.slug, t.created_at,
+		       (SELECT COUNT(*) FROM post_tags pt2 WHERE pt2.tag_id = t.id) AS post_count
+		FROM post_tags pt
+		JOIN tags t ON t.id = pt.tag_id
+		WHERE pt.post_id IN (`+strings.Join(placeholders, ",")+`)
+		ORDER BY pt.post_id, t.name ASC`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("batch post tags: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var postID int64
+		t := &model.Tag{}
+		if err := rows.Scan(&postID, &t.ID, &t.Name, &t.Slug, &t.CreatedAt, &t.PostCount); err != nil {
+			return nil, fmt.Errorf("scan batch tag: %w", err)
+		}
+		out[postID] = append(out[postID], t)
+	}
+	return out, rows.Err()
+}
+
 func (s *SQLiteStore) PostCategories(postID int64) ([]*model.Category, error) {
 	rows, err := s.db.Query(`
 		SELECT c.id, c.name, c.slug, c.description, c.parent_id, c.sort_order, c.created_at,
