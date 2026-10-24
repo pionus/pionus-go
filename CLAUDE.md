@@ -17,12 +17,14 @@ beyond a single binary and SQLite.
 
 ## Local Development With arry
 
-The blog and the framework are developed together. `go.work` (git-ignored)
-points at `../arry`, so local builds pick up framework changes immediately:
+The blog and the framework are developed together. A local `go.work`
+(git-ignored, see `go.work.example`) points at `../arry`, so local builds pick
+up framework changes immediately:
 
 ```bash
+cp go.work.example go.work   # first checkout
 cd ../arry && git pull
-go build ./...          # uses ../arry through go.work
+go build ./...               # uses ../arry through go.work
 ```
 
 `go.mod` pins a published arry pseudo-version, so `docker build` and CI do not
