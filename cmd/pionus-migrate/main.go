@@ -46,6 +46,7 @@ func main() {
 	skipImages := flag.Bool("skip-images", false, "do not audit images")
 	onlineAudit := flag.Bool("online-audit", false, "check external image URLs during audit")
 	pagesDir := flag.String("pages", "migration/pages", "directory of <slug>.md page overrides (custom theme pages)")
+	forcePages := flag.Bool("force-pages", false, "apply page overrides even with -skip-import (can overwrite edits)")
 	backup := flag.Bool("backup", true, "create a timestamped SQLite backup before writing")
 	flag.Parse()
 
@@ -83,6 +84,9 @@ func main() {
 	pageOverrides, err := typecho.LoadPageOverrides(*pagesDir)
 	if err != nil {
 		fatal("load page overrides", err)
+	}
+	if *skipImport && !*forcePages {
+		pageOverrides = nil
 	}
 
 	var out report
