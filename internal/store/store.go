@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -22,6 +23,7 @@ type Store interface {
 	MediaStore
 	NoteStore
 	OptionStore
+	Ping(ctx context.Context) error
 	Close() error
 }
 

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"fmt"
@@ -55,6 +56,10 @@ func NewSQLite(dbPath string) (*SQLiteStore, error) {
 	}
 
 	return s, nil
+}
+
+func (s *SQLiteStore) Ping(ctx context.Context) error {
+	return s.db.PingContext(ctx)
 }
 
 func (s *SQLiteStore) Close() error {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -88,6 +89,13 @@ func main() {
 	}
 
 	_ = db.DeleteExpiredSessions(time.Now())
+	go func() {
+		ticker := time.NewTicker(6 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			_ = db.DeleteExpiredSessions(time.Now())
+		}
+	}()
 
 	session := auth.NewManager(
 		db,
@@ -123,6 +131,12 @@ func main() {
 
 	// Health check
 	router.Get("/health", func(ctx arry.Context) {
+		pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if err := db.Ping(pingCtx); err != nil {
+			ctx.JSON(http.StatusServiceUnavailable, map[string]string{"status": "unavailable"})
+			return
+		}
 		ctx.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
 

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"errors"
 	"path/filepath"
 	"testing"
@@ -29,6 +30,13 @@ func mustPost(t *testing.T, s *SQLiteStore, p *model.Post) *model.Post {
 		t.Fatal(err)
 	}
 	return got
+}
+
+func TestPing(t *testing.T) {
+	s := newTestStore(t)
+	if err := s.Ping(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestOptionsSeeded(t *testing.T) {
