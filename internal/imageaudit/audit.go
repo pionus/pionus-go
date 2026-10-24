@@ -69,7 +69,7 @@ func Audit(db store.Store, uploadDir string, online bool) (*Report, error) {
 	seen := make(map[string]bool)
 	var externalRefs []Item
 	for _, p := range posts {
-		rendered := string(content.RenderPost(p).HTML)
+		rendered := string(content.RenderPostCached(p).HTML)
 		for _, raw := range extract(rendered) {
 			raw = strings.TrimSpace(html.UnescapeString(raw))
 			if raw == "" || strings.HasPrefix(raw, "data:") {

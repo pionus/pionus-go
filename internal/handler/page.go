@@ -301,7 +301,7 @@ func renderArticle(ctx arry.Context, db store.Store, guard *PostGuard, slug, err
 		return
 	}
 
-	rendered := content.RenderPost(post)
+	rendered := content.RenderPostCached(post)
 	plain := model.PlainText(post.Content)
 	readingTime := (len([]rune(plain)) + 199) / 200
 	if readingTime < 1 {
