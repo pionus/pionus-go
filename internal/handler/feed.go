@@ -74,6 +74,7 @@ func Feed(db store.Store) arry.Handler {
 			doc.Channel.Items = append(doc.Channel.Items, item)
 		}
 
+		ctx.SetHeader("Cache-Control", "public, max-age=300")
 		writeXML(ctx, doc, "application/rss+xml; charset=utf-8")
 	}
 }
@@ -119,6 +120,7 @@ func CommentsFeed(db store.Store) arry.Handler {
 			})
 		}
 
+		ctx.SetHeader("Cache-Control", "public, max-age=300")
 		writeXML(ctx, doc, "application/rss+xml; charset=utf-8")
 	}
 }
@@ -176,6 +178,7 @@ func Sitemap(db store.Store) arry.Handler {
 			add(base+"/tag/"+url.PathEscape(t.Slug), now.Format("2006-01-02"))
 		}
 
+		ctx.SetHeader("Cache-Control", "public, max-age=300")
 		writeXML(ctx, doc, "application/xml; charset=utf-8")
 	}
 }
@@ -184,6 +187,7 @@ func Robots(db store.Store) arry.Handler {
 	return func(ctx arry.Context) {
 		base := siteBaseURL(ctx, db)
 		body := "User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /search\nSitemap: " + base + "/sitemap.xml\n"
+		ctx.SetHeader("Cache-Control", "public, max-age=3600")
 		ctx.SetContentType("text/plain; charset=utf-8")
 		ctx.Status(http.StatusOK)
 		ctx.Response().Write([]byte(body))
