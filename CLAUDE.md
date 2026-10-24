@@ -13,6 +13,8 @@ beyond a single binary and SQLite.
 - **Framework**: arry (`github.com/pionus/arry`)
 - **Database**: SQLite via `modernc.org/sqlite` (pure Go, no CGO)
 - **Markdown**: `github.com/yuin/goldmark` (GFM + raw HTML)
+- **Search**: SQLite FTS5 trigram
+- **Code highlighting**: self-hosted highlight.js
 - **Config**: YAML + environment variables
 
 ## Local Development With arry
@@ -47,9 +49,14 @@ pionus-go/
 ├── cmd/
 │   └── pionus-migrate/           # Dedicated Typecho migration command
 ├── scripts/
-│   └── migrate-typecho.sh        # One-shot migration wrapper
+│   ├── migrate-typecho.sh        # One-shot migration wrapper
+│   └── backup.sh                 # SQLite + uploads backup
+├── deploy/
+│   ├── k8s/pionus.yaml           # Deployment, Service, PVC
+│   └── README.md                 # Deployment/Caddy/backup notes
 ├── internal/
 │   ├── config/                   # Config loader (YAML + env)
+│   ├── server/                   # App wiring, middleware and routes
 │   ├── model/                    # Domain types and constants
 │   │   ├── post.go               # Post, types/statuses, excerpt helpers
 │   │   ├── user.go               # User, roles
@@ -124,7 +131,10 @@ pionus-go/
 ```yaml
 server:
   addr: ":8087"
+  access_log: "logs/access.log"  # "-" logs to stdout
 timezone: "Asia/Shanghai"
+security:
+  secret: ""                     # set PIONUS_SECRET in production
 database:
   path: "./data/pionus.db"
 upload:
@@ -147,6 +157,8 @@ Environment overrides:
 | `PIONUS_ADDR` | Listen address |
 | `PIONUS_DB_PATH` | SQLite file path |
 | `PIONUS_TIMEZONE` | IANA timezone for timestamps |
+| `PIONUS_SECRET` | HMAC secret for password-post cookies |
+| `PIONUS_ACCESS_LOG` | Access log path; `-` means stdout |
 | `PIONUS_UPLOAD_DIR` | Upload directory |
 | `PIONUS_UPLOAD_MAX_MB` | Max upload size |
 | `PIONUS_SESSION_COOKIE` | Session cookie name |
@@ -193,7 +205,9 @@ serves templates embedded in the binary.
 | POST | `/admin/posts/:id/delete` | Delete a post |
 | POST | `/admin/preview` | Render Markdown fragment for the editor preview |
 | GET | `/admin/categories`, `/admin/tags` | Taxonomy management |
-| GET/POST | `/admin/notes` | Create/delete 微语 entries |
+| GET/POST | `/admin/notes` | Create/delete/edit 微语 entries |
+| GET/POST | `/admin/profile` | Change own password |
+| GET/POST | `/admin/users` | Owner/admin user management |
 | GET | `/admin/comments` | Comment moderation |
 | GET | `/admin/media` | Media library and upload |
 | GET/POST | `/admin/settings` | Site settings |
@@ -214,14 +228,16 @@ Old Typecho URLs are intentionally not supported; they return the themed 404.
 | GET | `/` | Home: intro, latest posts, categories and tags |
 | GET | `/article?page=N` | Archive grouped by year |
 | GET | `/article/:slug` | Post/page detail with TOC, comments, math |
+| POST | `/article/:slug/unlock` | Password-post access form |
 | POST | `/article/:slug/comment` | Native comment submission (CSRF, honeypot, time trap) |
 | GET | `/category/:slug` | Category archive |
 | GET | `/tag/:slug` | Tag archive |
 | GET | `/archives/:year[/:month[/:day]]` | Date archives |
 | GET | `/search?q=` | Search |
 | GET | `/notes` | 微语 timeline |
+| GET | `/notes/:id` | 微语 permalink |
 | GET | `/categories`, `/tags` | Taxonomy indexes |
-| GET | `/feed`, `/feed/comments` | RSS 2.0 feeds |
+| GET | `/feed`, `/feed/notes`, `/feed/comments` | RSS 2.0 feeds |
 | GET | `/sitemap.xml`, `/robots.txt` | SEO endpoints |
 | GET | `/health` | Health check |
 
@@ -242,6 +258,7 @@ Old Typecho URLs are intentionally not supported; they return the themed 404.
 | `post_categories`, `post_tags` | Many-to-many relations (Typecho-compatible) |
 | `comments` | Threaded comments with `pending`/`approved`/`spam` |
 | `notes` | 微语 short posts for the timeline |
+| `posts_fts` | Trigram FTS5 index maintained by triggers |
 | `media` | Uploaded files |
 | `sessions` | Server-side login sessions (SHA-256 token hash) |
 | `options` | Site settings |
@@ -342,10 +359,12 @@ redirected. Details and current gaps are in `tools/README.md`.
    in `internal/content`, not duplicated between API and admin.
 3. **New storage method**: add to the relevant interface in `store.go`, then
    implement in the matching file; always update tests.
-4. **Schema change**: add `003_*.sql`; never edit an applied migration. The
-   runner records versions in `schema_migrations`.
-5. **Rendering**: use `content.RenderPost` for public post bodies. It handles
-   Markdown/HTML, heading IDs, TOC, legacy HTML cleanup and math detection.
+4. **Schema change**: add `002_*.sql`; never edit an applied migration. `001_init.sql`
+   is the squashed baseline for fresh installs. The runner records versions in
+   `schema_migrations`. `posts_fts` is maintained by triggers, so content updates
+   must go through `posts` writes.
+5. **Rendering**: use `content.RenderPostCached` for public post bodies. It
+   handles Markdown/HTML, heading IDs, TOC, legacy HTML cleanup and math detection.
 6. **Theme**: templates live in `web/theme/pages` and are embedded; data keys
    are built in `internal/handler` (`Posts`, `Groups`, `Post`, `Rendered`,
    `TOC`, `Comments`, `Form`, `CSRF`, ...).
@@ -354,22 +373,31 @@ redirected. Details and current gaps are in `tools/README.md`.
 8. **Uploads**: validate by sniffed MIME, never by the client filename; keep
    the generated path relative and store it in `media.path`.
 
+## Operations
+
+- `scripts/backup.sh` creates a consistent SQLite backup and uploads archive.
+- `deploy/k8s/pionus.yaml` runs one replica with a `Recreate` strategy because
+  SQLite and uploads live on one PVC.
+- CI (`.github/workflows/ci.yml`) runs gofmt, vet, tests and a Docker build.
+- Production should set `PIONUS_SECRET`, `PIONUS_SESSION_SECURE=1`, and
+  `PIONUS_ACCESS_LOG=-` (stdout) behind Caddy.
+
 ## Current Status / Next Steps
 
 Done: schema, store layer, JSON API, Paper & Ink public theme (home, archives,
 post, TOC, code copy, KaTeX, responsive dark mode), native comments with
 moderation and sanitizing, search, RSS/comments feeds, sitemap, image fallback,
 embedded assets, and the Typecho importer with idempotent content, taxonomy,
-comment and attachment handling, the 微语 timeline (from the old `dreams`
-table), and curated 传送门/微语 page overrides. Old Typecho URLs intentionally
-return 404.
+comment and attachment handling, password-post gating, the 微语 timeline (from
+the old `dreams` table), curated 传送门/微语 page overrides, FTS5 search, render
+caching, code highlighting, user management and deployment/backup/CI assets.
+Old Typecho URLs intentionally return 404.
 
-Pending for full Typecho parity:
+Remaining polish:
 
-1. Password-protected post gating.
-2. Draft preview links for anonymous reviewers.
-3. Comment email notifications and optional rate limiting.
-4. Recovering the three missing Typecho attachments (files are absent on the
-   old server).
-5. Deployment: point DNS at the new host, migrate `data/` + `uploads/`, enable
-   HTTPS/secure cookies.
+1. Anonymous draft preview links.
+2. Comment email notifications and a persistent/shared rate limiter.
+3. Import transaction wrapping (the importer is idempotent but not atomic).
+4. Narrow handler dependencies and split large store interfaces.
+5. Recover the three missing Typecho attachments if a backup exists.
+6. Point DNS at the new host and run the production migration.

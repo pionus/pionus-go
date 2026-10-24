@@ -9,12 +9,16 @@ URLs are not preserved; imported content links are rewritten to the new routes.
 
 - Posts and independent pages, drafts, private and scheduled publishing
 - Categories, tags, threaded comments with moderation
-- 微语 timeline for short posts, with a simple admin composer
+- 微语 timeline for short posts, with a simple admin composer and permalinks
 - Paper & Ink public theme (embedded): archive, category/tag/date pages,
   search, TOC, code copy, KaTeX math, dark mode, broken-image placeholders
 - 传送门 friend-links page and 微语 timeline
-- Native threaded comments with moderation, CSRF, honeypot and HTML sanitizing
-- RSS feed, comments feed, sitemap and robots.txt
+- Native threaded comments with moderation, CSRF, honeypot, rate limiting and
+  HTML sanitizing
+- RSS feed, notes feed, comments feed, sitemap and robots.txt
+- SQLite FTS5 trigram search, render caching and self-hosted code highlighting
+- Password-protected posts, admin password change and user roles
+- Deployment manifests, backup script and CI
 - Admin UI at `/admin`: dashboard, Markdown editor with preview, media
   library, taxonomies, comments and settings
 - bcrypt login, server-side sessions, CSRF protection, upload MIME validation
@@ -62,8 +66,9 @@ existing database.
 
 Old Typecho URLs are intentionally not redirected. Imported content internal
 links point at the new routes, so bookmarks to the old PHP addresses will 404.
-See `tools/README.md` for what is converted and the remaining gaps. To audit
-old images:
+See `tools/README.md` for what is converted and the remaining gaps. Use
+`--force-pages` only when you want to re-apply `migration/pages` overrides on an
+existing database. To audit old images:
 
 ```bash
 pionus -config config.yaml -audit-images
@@ -73,6 +78,10 @@ pionus -config config.yaml -audit-images
 
 See `config.yaml` for server, timezone, database, upload and session settings,
 and `.env.example` for environment overrides.
+
+## Deployment
+
+See `deploy/README.md` for Kubernetes, Caddy and backup notes.
 
 ## Development
 

@@ -55,8 +55,10 @@ Run just the repair/audit stages on an existing database:
 ```
 
 Useful flags: `--drafts`, `--online-audit`, `--skip-links`, `--skip-images`,
-`--backup=false` and `--dry-run`. The JSON report contains `import`, `links`,
-`images` and `verify` sections.
+`--backup=false`, `--dry-run` and `--force-pages`. The JSON report contains
+`import`, `links`, `images` and `verify` sections. Page overrides are applied on
+import; on `--skip-import` they are skipped unless `--force-pages` is passed, so
+a link-only run cannot overwrite later edits.
 
 The importer is idempotent: posts and comments are matched by their Typecho
 ID (`source = typecho`) and taxonomies by slug. Re-running updates posts

@@ -1,4 +1,4 @@
-.PHONY: dev build start stop restart migrate migrate-typecho migrate-links test vet fmt tidy docker audit audit-online
+.PHONY: dev build start stop restart migrate migrate-typecho migrate-links test vet fmt tidy docker audit audit-online backup
 
 OUTFILE=pionus
 PIDFILE=pionus.pid
@@ -49,3 +49,6 @@ audit:
 
 audit-online:
 	go run . -audit-images -audit-images-online
+
+backup:
+	./scripts/backup.sh
