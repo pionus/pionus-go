@@ -1,0 +1,17 @@
+.git
+.gitignore
+.dockerignore
+data/
+uploads/
+logs/
+certs/
+*.db
+*.db-shm
+*.db-wal
+pionus
+pionus.pid
+.env
+go.work
+go.work.sum
+theme/default/node_modules/
+theme/default/web_modules/

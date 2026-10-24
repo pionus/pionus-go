@@ -1,56 +1,81 @@
-# Pionus-Go Personal Blog Backend
+# Pionus-Go Personal Blog
 
 ## Project Overview
 
-Personal blog backend built with custom web framework **arry**. Serves articles via RESTful JSON API and SSR pages, backed by SQLite.
+A self-hosted blog engine built with the custom **arry** web framework. It is
+being developed as a Go replacement for a Typecho (PHP) blog: same content
+semantics, old URLs kept alive with redirects, and no runtime dependencies
+beyond a single binary and SQLite.
 
 ## Tech Stack
 
-- **Language**: Go 1.24+
-- **Framework**: arry (custom, github.com/pionus/arry)
-- **API**: RESTful JSON
-- **Database**: SQLite (modernc.org/sqlite, pure Go)
+- **Go** 1.25
+- **Framework**: arry (`github.com/pionus/arry`)
+- **Database**: SQLite via `modernc.org/sqlite` (pure Go, no CGO)
+- **Markdown**: `github.com/yuin/goldmark` (GFM + raw HTML)
 - **Config**: YAML + environment variables
 
-## Architecture
+## Local Development With arry
 
-### Directory Structure
+The blog and the framework are developed together. `go.work` (git-ignored)
+points at `../arry`, so local builds pick up framework changes immediately:
+
+```bash
+cd ../arry && git pull
+go build ./...          # uses ../arry through go.work
+```
+
+`go.mod` pins a published arry pseudo-version, so `docker build` and CI do not
+need the sibling checkout. When arry changes are ready to ship, push arry and
+bump the pin:
+
+```bash
+go get github.com/pionus/arry@<commit>
+```
+
+Rule of thumb: **generic HTTP/framework behavior belongs in arry; blog domain
+logic belongs here.** Framework changes need tests in `../arry`.
+
+## Directory Structure
 
 ```
 pionus-go/
-├── main.go                      # Entry point
-├── config.go                    # Config loader (YAML + env)
-├── config.yaml                  # Configuration file
+├── main.go                       # Entry point, routing, middleware
+├── config.go                     # Config loader (YAML + env)
+├── config.yaml
 ├── internal/
-│   ├── model/
-│   │   └── article.go           # Article model
+│   ├── model/                    # Domain types and constants
+│   │   ├── post.go               # Post, types/statuses, excerpt helpers
+│   │   ├── user.go               # User, roles
+│   │   ├── taxonomy.go           # Category, Tag, Slugify
+│   │   ├── comment.go
+│   │   ├── media.go              # Media, Session
+│   │   └── redirect.go
 │   ├── store/
-│   │   ├── store.go             # Store interface
-│   │   └── sqlite.go            # SQLite implementation
+│   │   ├── store.go              # Store interfaces + filters + errors
+│   │   ├── sqlite.go             # Connection, WAL, migration runner
+│   │   ├── migrations/           # Embedded SQL migrations
+│   │   ├── post.go
+│   │   ├── taxonomy.go
+│   │   ├── comment.go
+│   │   ├── user.go
+│   │   ├── media.go
+│   │   └── option.go             # Options + redirects
 │   ├── handler/
-│   │   ├── article.go           # REST API handlers
-│   │   └── page.go              # SSR page handlers
+│   │   ├── post.go               # JSON API
+│   │   └── page.go               # SSR pages
 │   └── migrate/
-│       └── markdown.go          # Markdown → SQLite migration
-├── migrations/
-│   └── 001_create_articles.sql  # Schema reference
-├── markdowns/                   # Legacy markdown files
-├── theme/                       # Frontend theme (git submodule)
-├── Makefile                     # Build system
-├── Dockerfile                   # Container build
-└── .env.example                 # Environment variable template
+│       └── markdown.go           # Legacy markdown import
+├── markdowns/                    # Legacy markdown files
+├── theme/                        # Frontend theme (git submodule)
+├── Dockerfile
+└── Makefile
 ```
-
-### Key Patterns
-
-1. **SQLite Storage** — Single-file database, no external dependencies
-2. **Store Interface** — Clean abstraction for CRUD operations
-3. **Slug-Based URLs** — URL-friendly article identifiers
-4. **Handler Closures** — Dependency injection via closure pattern
 
 ## Configuration
 
 `config.yaml`:
+
 ```yaml
 server:
   addr: ":8087"
@@ -58,109 +83,134 @@ theme: default
 database:
   path: "./data/pionus.db"
 tls:
-  cert: ""
+  cert: ""     # when set, arry uses Let's Encrypt autocert for these domains
   key: ""
 ```
 
-Environment variable overrides:
-- `PIONUS_AUTH_TOKEN` — Auth token for protected endpoints
-- `PIONUS_ADDR` — Server address
-- `PIONUS_DB_PATH` — Database path
+Environment overrides:
+
+| Variable | Purpose |
+|---|---|
+| `PIONUS_AUTH_TOKEN` | Token for write API calls |
+| `PIONUS_ADDR` | Listen address |
+| `PIONUS_DB_PATH` | SQLite file path |
+
+Site settings (title, author, posts per page, comment switches) live in the
+`options` table, seeded by the first migration. This mirrors Typecho's
+`typecho_options` and keeps content configuration out of the process config.
 
 ## Routes
 
-### REST API
+### JSON API
+
+Writes require `Authorization: <token>` or `Authorization: Bearer <token>`.
+The aliases under `/api/articles` are kept for compatibility.
+
 | Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/api/articles` | No | List articles (?page=&limit=) |
-| GET | `/api/articles/:slug` | No | Get article |
-| POST | `/api/articles` | Yes | Create article |
-| PUT | `/api/articles/:slug` | Yes | Update article |
-| DELETE | `/api/articles/:slug` | Yes | Delete article |
+|---|---|---|---|
+| GET | `/api/posts` | No | List published posts (`page`, `limit`, `q`, `category`, `tag`) |
+| GET | `/api/posts/:slug` | No | Get a post; drafts need auth |
+| POST | `/api/posts` | Yes | Create a post |
+| PUT | `/api/posts/:slug` | Yes | Update a post |
+| DELETE | `/api/posts/:slug` | Yes | Delete a post |
 
 ### SSR Pages
+
 | Method | Path | Description |
-|--------|------|-------------|
-| GET | `/` | Homepage |
-| GET | `/article` | Article list page |
-| GET | `/article/:slug` | Article detail page |
+|---|---|---|
+| GET | `/` | Cover page with the latest 5 posts |
+| GET | `/article?page=N` | Archive grouped by year |
+| GET | `/article/:slug` | Post detail (drafts visible to auth only) |
+| GET | `/health` | Health check |
 
 ### Static
+
 - `/assets` → `./theme/{theme}/assets`
 - `/node_modules` → `./theme/{theme}/node_modules`
 - `/web_modules` → `./theme/{theme}/web_modules`
 
+## Data Model
+
+`internal/store/migrations/001_init.sql` is the source of truth.
+
+| Table | Purpose |
+|---|---|
+| `posts` | Posts and pages; `type` = `post`/`page`, `status` = `publish`/`draft`/`hidden`/`waiting` |
+| `users` | Accounts and roles (`owner`/`admin`/`editor`/`contributor`) |
+| `categories`, `tags` | Taxonomies |
+| `post_categories`, `post_tags` | Many-to-many relations (Typecho-compatible) |
+| `comments` | Threaded comments with `pending`/`approved`/`spam` |
+| `media` | Uploaded files |
+| `sessions` | Server-side login sessions (SHA-256 token hash) |
+| `options` | Site settings |
+| `redirects` | Legacy URL → new URL mapping for SEO-preserving migration |
+| `schema_migrations` | Applied migration versions |
+
+Semantics:
+
+- A published post always has `published_at`; future values mean scheduled.
+- Public reads filter on `status = publish` and `published_at <= now`.
+- `excerpt` is generated from Markdown when not provided.
+- Post password is exposed as `password` on input only and never in JSON output.
+- Author display name resolves as `users.screen_name` → `users.username` →
+  `options.site.author`.
+
+## Store Interfaces
+
+`store.Store` composes focused interfaces: `PostStore`, `TaxonomyStore`,
+`CommentStore`, `UserStore`, `MediaStore`, `OptionStore`, `RedirectStore`.
+Handlers depend on `store.Store`. Errors are matched with `errors.Is` against
+`store.ErrNotFound` and `store.ErrConflict`.
+
 ## Build & Run
 
 ```bash
-make dev          # Run with go run
-make build        # Compile binary
-make start        # Build + start (background)
-make stop         # Stop server
-make restart      # Stop + start
-make migrate      # Migrate markdowns to SQLite
+make dev          # go run .
+make build        # compile binary
+make start        # build + start in background
+make stop
+make restart
+make migrate      # import markdowns/ into SQLite (idempotent)
+make test
+make vet
+make fmt
+make docker
 ```
 
-### Docker
+Docker:
+
 ```bash
 docker build -t pionus .
-docker run -p 8087:8087 -e PIONUS_AUTH_TOKEN=secret pionus
+docker run -p 8087:8087 -e PIONUS_AUTH_TOKEN=secret \
+  -v "$PWD/data:/app/data" -v "$PWD/uploads:/app/uploads" pionus
 ```
 
-## Models
-
-### Article
-```go
-type Article struct {
-    ID        int64     `json:"id"`
-    Slug      string    `json:"slug"`
-    Title     string    `json:"title"`
-    Content   string    `json:"content"`
-    Author    string    `json:"author"`
-    CreatedAt time.Time `json:"created_at"`
-    UpdatedAt time.Time `json:"updated_at"`
-}
-```
-
-## Store Interface
-
-```go
-type Store interface {
-    GetArticle(slug string) (*model.Article, error)
-    ListArticles(page, limit int) ([]*model.Article, int, error)
-    CreateArticle(a *model.Article) error
-    UpdateArticle(slug string, a *model.Article) error
-    DeleteArticle(slug string) error
-    Close() error
-}
-```
+The image runs as UID 10001 and uses `go.mod` (not `go.work`) to build.
 
 ## Development Guidelines
 
-### Adding New Routes
-1. Define handler in `internal/handler/`
-2. Register in `main.go` router
-3. Use closure pattern: `func MyHandler(db store.Store) arry.Handler`
+1. **New route**: handler in `internal/handler/`, register in `main.go`.
+2. **New storage method**: add to the relevant interface in `store.go`, then
+   implement in the matching file; always update tests.
+3. **Schema change**: add `002_*.sql`; never edit an applied migration. The
+   runner records versions in `schema_migrations`.
+4. **Markdown**: render through the shared goldmark instance in `page.go`.
+5. **Theme data keys**: `Articles`, `Groups`, `Article`, `RenderedContent`,
+   `ReadingTime`, `Prev`, `Next`, `CurrentPath` are consumed by the submodule.
+6. **Money path**: public listings must never expose drafts, hidden posts, or
+   scheduled posts.
 
-### Theme Development
-1. Theme is git submodule in `theme/`
-2. Views in `theme/{theme}/pages/`
-3. Assets in `theme/{theme}/assets/`
-4. Update: `git submodule update --remote`
+## Current Status / Next Steps
 
-### Migration
-Run `make migrate` to import legacy markdown files into SQLite. Idempotent — safe to run multiple times.
+Done: schema, store layer, post API, SSR pages, markdown import, WAL, build.
 
-## Troubleshooting
+Pending for Typecho parity:
 
-### Database issues
-- Ensure `data/` directory is writable
-- Check `config.yaml` database path
-- SQLite file: `data/pionus.db`
-
-### Theme not loading
-- Update submodule: `git submodule update --init --recursive`
-- Check `config.yaml` theme name
-
-### Arry framework
-- Source: github.com/pionus/arry (fetched via `go mod download`)
+1. Bootstrap command / first-run admin account (bcrypt + sessions + CSRF).
+2. Admin UI: dashboard, post editor, media upload, taxonomy and comment
+   moderation, settings.
+3. Typecho importer (`typecho_contents`/`metas`/`relationships`/`comments`/
+   `users`), `usr/uploads` migration and 301 redirect map.
+4. Permalinks matching Typecho (`/archives/:slug/`, `/category/:slug/`,
+   `/tag/:slug/`), feeds, sitemap, search.
+5. Theme rewrite in Go templates.

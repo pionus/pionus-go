@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -15,6 +16,8 @@ import (
 
 var titleRe = regexp.MustCompile(`(?m)^#\s+(.+)`)
 
+// MarkdownToSQLite imports legacy markdown files into the store. It is
+// idempotent: existing slugs are skipped.
 func MarkdownToSQLite(mdDir string, db store.Store) error {
 	entries, err := os.ReadDir(mdDir)
 	if err != nil {
@@ -39,25 +42,26 @@ func MarkdownToSQLite(mdDir string, db store.Store) error {
 		}
 
 		created := parseCreatedTime(name)
-		slug := name
-
-		a := &model.Article{
-			Slug:      slug,
-			Title:     title,
-			Content:   string(data),
-			Author:    "Secbone",
-			CreatedAt: created,
+		post := &model.Post{
+			Slug:        name,
+			Title:       title,
+			Content:     string(data),
+			Excerpt:     model.MakeExcerpt(string(data), 200),
+			Type:        model.PostTypePost,
+			Status:      model.StatusPublish,
+			CreatedAt:   created,
+			PublishedAt: &created,
 		}
 
-		if err := db.CreateArticle(a); err != nil {
-			if strings.Contains(err.Error(), "UNIQUE") {
-				slog.Info("skip existing", "slug", slug)
+		if err := db.CreatePost(post); err != nil {
+			if errors.Is(err, store.ErrConflict) {
+				slog.Info("skip existing", "slug", name)
 				continue
 			}
-			slog.Warn("skip article", "slug", slug, "err", err)
+			slog.Warn("skip article", "slug", name, "err", err)
 			continue
 		}
-		slog.Info("migrated", "slug", slug, "title", title)
+		slog.Info("migrated", "slug", name, "title", title)
 	}
 	return nil
 }

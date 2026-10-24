@@ -51,7 +51,7 @@ func main() {
 			"error": "internal server error",
 		})
 	}))
-	app.Use(middlewares.Auth(cfg.AuthToken))
+	app.Use(middlewares.Auth(cfg.AuthToken, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete))
 
 	themePath := "./theme/" + cfg.Theme
 	app.Static("/assets", themePath+"/assets")
@@ -72,11 +72,18 @@ func main() {
 	router.Get("/article/:slug", handler.ArticleDetail(db))
 
 	// REST API
-	router.Get("/api/articles", handler.ListArticles(db))
-	router.Get("/api/articles/:slug", handler.GetArticle(db))
-	router.Post("/api/articles", handler.CreateArticle(db))
-	router.Put("/api/articles/:slug", handler.UpdateArticle(db))
-	router.Delete("/api/articles/:slug", handler.DeleteArticle(db))
+	router.Get("/api/posts", handler.ListPosts(db))
+	router.Get("/api/posts/:slug", handler.GetPost(db))
+	router.Post("/api/posts", handler.CreatePost(db))
+	router.Put("/api/posts/:slug", handler.UpdatePost(db))
+	router.Delete("/api/posts/:slug", handler.DeletePost(db))
+
+	// Legacy article endpoints kept as aliases.
+	router.Get("/api/articles", handler.ListPosts(db))
+	router.Get("/api/articles/:slug", handler.GetPost(db))
+	router.Post("/api/articles", handler.CreatePost(db))
+	router.Put("/api/articles/:slug", handler.UpdatePost(db))
+	router.Delete("/api/articles/:slug", handler.DeletePost(db))
 
 	slog.Info("starting server", "addr", cfg.Server.Addr)
 	if cfg.TLS.Cert != "" {

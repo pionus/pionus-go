@@ -2,35 +2,55 @@ package handler
 
 import (
 	"bytes"
-	"database/sql"
 	"errors"
 	"html/template"
 	"log/slog"
 	"math"
 	"strconv"
-	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/pionus/arry"
 	"github.com/pionus/pionus-go/internal/model"
 	"github.com/pionus/pionus-go/internal/store"
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/renderer/html"
 )
 
-// YearGroup holds articles grouped by year for the article list page.
+// YearGroup holds posts grouped by year for the archive page.
 type YearGroup struct {
-	Year     int
-	Articles []*model.Article
+	Year  int
+	Posts []*model.Post
 }
+
+// Articles returns the posts in the group. It is kept as an alias so older
+// templates keep working.
+func (g YearGroup) Articles() []*model.Post {
+	return g.Posts
+}
+
+var markdown = goldmark.New(
+	goldmark.WithExtensions(extension.GFM),
+	goldmark.WithRendererOptions(html.WithUnsafe()),
+)
 
 func Index(db store.Store) arry.Handler {
 	return func(ctx arry.Context) {
-		articles, _, err := db.ListArticles(1, 5)
+		now := time.Now()
+		posts, _, err := db.ListPosts(store.PostFilter{
+			Type:            model.PostTypePost,
+			Statuses:        []string{model.StatusPublish},
+			PublishedBefore: &now,
+			Page:            1,
+			Limit:           5,
+		})
 		if err != nil {
 			slog.Error("index page", "err", err)
 		}
+
 		ctx.Render(200, "cover.html", map[string]interface{}{
-			"Articles":    articles,
+			"Articles":    posts,
 			"CurrentPath": "/",
 		})
 	}
@@ -38,16 +58,22 @@ func Index(db store.Store) arry.Handler {
 
 func ArticleList(db store.Store) arry.Handler {
 	return func(ctx arry.Context) {
-		pageStr := ctx.Query("page")
 		page := 1
-		if pageStr != "" {
-			if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+		if raw := ctx.Query("page"); raw != "" {
+			if p, err := strconv.Atoi(raw); err == nil && p > 0 {
 				page = p
 			}
 		}
-		limit := 50
+		const limit = 50
+		now := time.Now()
 
-		articles, total, err := db.ListArticles(page, limit)
+		posts, total, err := db.ListPosts(store.PostFilter{
+			Type:            model.PostTypePost,
+			Statuses:        []string{model.StatusPublish},
+			PublishedBefore: &now,
+			Page:            page,
+			Limit:           limit,
+		})
 		if err != nil {
 			slog.Error("article list page", "err", err)
 			ctx.Reply(500)
@@ -55,15 +81,17 @@ func ArticleList(db store.Store) arry.Handler {
 		}
 
 		totalPages := int(math.Ceil(float64(total) / float64(limit)))
+		if totalPages < 1 {
+			totalPages = 1
+		}
 
-		// Group articles by year
-		var groups []YearGroup
-		for _, a := range articles {
-			year := a.CreatedAt.Year()
+		groups := make([]YearGroup, 0)
+		for _, p := range posts {
+			year := p.DisplayTime().Year()
 			if len(groups) == 0 || groups[len(groups)-1].Year != year {
 				groups = append(groups, YearGroup{Year: year})
 			}
-			groups[len(groups)-1].Articles = append(groups[len(groups)-1].Articles, a)
+			groups[len(groups)-1].Posts = append(groups[len(groups)-1].Posts, p)
 		}
 
 		ctx.Render(200, "index.html", map[string]interface{}{
@@ -80,13 +108,12 @@ func ArticleList(db store.Store) arry.Handler {
 }
 
 func ArticleDetail(db store.Store) arry.Handler {
-	md := goldmark.New()
-
 	return func(ctx arry.Context) {
 		slug := ctx.Param("slug")
-		article, err := db.GetArticle(slug)
+
+		post, err := db.GetPost(slug)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) || strings.Contains(err.Error(), "not found") {
+			if errors.Is(err, store.ErrNotFound) {
 				ctx.Reply(404)
 				return
 			}
@@ -95,24 +122,36 @@ func ArticleDetail(db store.Store) arry.Handler {
 			return
 		}
 
-		// Render markdown to HTML
+		// Drafts and scheduled posts are only visible to authenticated users.
+		if !post.IsPublished() && !ctx.IsAuthed() {
+			ctx.Reply(404)
+			return
+		}
+		if post.PublishedAt != nil && post.PublishedAt.After(time.Now()) && !ctx.IsAuthed() {
+			ctx.Reply(404)
+			return
+		}
+
 		var buf bytes.Buffer
-		if err := md.Convert([]byte(article.Content), &buf); err != nil {
+		if err := markdown.Convert([]byte(post.Content), &buf); err != nil {
 			slog.Error("markdown render", "slug", slug, "err", err)
 		}
 
-		// Calculate reading time (~200 Chinese chars or words per minute)
-		wordCount := utf8.RuneCountInString(article.Content)
-		readingTime := int(math.Ceil(float64(wordCount) / 200.0))
+		plain := model.PlainText(post.Content)
+		readingTime := int(math.Ceil(float64(utf8.RuneCountInString(plain)) / 200.0))
 		if readingTime < 1 {
 			readingTime = 1
 		}
 
-		// Get adjacent articles
-		prev, next, _ := db.GetAdjacentArticles(slug)
+		prev, next, err := db.AdjacentPosts(slug)
+		if err != nil {
+			slog.Warn("adjacent posts", "slug", slug, "err", err)
+		}
+
+		_ = db.IncrementPostViews(slug)
 
 		ctx.Render(200, "article.html", map[string]interface{}{
-			"Article":         article,
+			"Article":         post,
 			"RenderedContent": template.HTML(buf.String()),
 			"ReadingTime":     readingTime,
 			"Prev":            prev,

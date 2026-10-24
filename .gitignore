@@ -8,3 +8,8 @@ logs
 pionus
 .env
 data/
+
+go.work
+go.work.sum
+uploads/
+certs/

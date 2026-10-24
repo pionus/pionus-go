@@ -1,18 +1,27 @@
-FROM golang:1.24-alpine AS builder
+# syntax=docker/dockerfile:1
 
-WORKDIR /build
+FROM golang:1.25-alpine AS builder
+
+WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -o pionus .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/pionus .
 
-FROM alpine:3.21
-RUN apk add --no-cache ca-certificates tzdata
+FROM alpine:3.22
+
+RUN apk add --no-cache ca-certificates tzdata \
+    && adduser -D -H -u 10001 pionus \
+    && mkdir -p /app/data /app/uploads /app/logs \
+    && chown -R pionus:pionus /app
+
 WORKDIR /app
-COPY --from=builder /build/pionus .
-COPY --from=builder /build/config.yaml .
-COPY --from=builder /build/theme ./theme
-COPY --from=builder /build/markdowns ./markdowns
+COPY --from=builder /out/pionus ./pionus
+COPY --from=builder /src/config.yaml ./config.yaml
+COPY --from=builder /src/theme ./theme
+COPY --from=builder /src/markdowns ./markdowns
 
+USER pionus
 EXPOSE 8087
+
 CMD ["./pionus"]

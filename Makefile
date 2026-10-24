@@ -1,4 +1,4 @@
-.PHONY: dev build start stop restart migrate
+.PHONY: dev build start stop restart migrate test vet fmt tidy docker
 
 OUTFILE=pionus
 PIDFILE=pionus.pid
@@ -11,7 +11,7 @@ build:
 
 stop:
 ifneq (,$(wildcard $(PIDFILE)))
-	kill -9 $$(cat $(PIDFILE))
+	kill -9 $$(cat $(PIDFILE)) 2>/dev/null || true
 	rm -f $(PIDFILE)
 endif
 
@@ -22,3 +22,18 @@ restart: stop start
 
 migrate:
 	go run . -migrate
+
+test:
+	go test ./...
+
+vet:
+	go vet ./...
+
+fmt:
+	gofmt -w $$(find . -name '*.go' -not -path './theme/*')
+
+tidy:
+	go mod tidy
+
+docker:
+	docker build -t pionus .

@@ -3,12 +3,10 @@ module github.com/pionus/pionus-go
 go 1.25.0
 
 require (
-	github.com/pionus/arry v0.0.0-20251215051833-def29d9ba9ad
+	github.com/pionus/arry v0.0.0-20261024103043-a4402168eee9
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.46.2
 )
-
-replace github.com/pionus/arry => ../arry
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
