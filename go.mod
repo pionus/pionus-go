@@ -3,7 +3,9 @@ module github.com/pionus/pionus-go
 go 1.25.0
 
 require (
-	github.com/pionus/arry v0.0.0-20261024103043-a4402168eee9
+	github.com/pionus/arry v0.0.0-20261024115432-a1c8a7182bc5
+	github.com/yuin/goldmark v1.7.16
+	golang.org/x/crypto v0.45.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.46.2
 )
@@ -14,8 +16,6 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/yuin/goldmark v1.7.16 // indirect
-	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.31.0 // indirect

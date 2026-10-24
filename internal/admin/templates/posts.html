@@ -1,0 +1,77 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<div class="page-head">
+  <h1>文章</h1>
+  <a class="btn primary" href="/admin/posts/new">写文章</a>
+</div>
+
+<form class="panel" method="get" action="/admin/posts">
+  <div class="row">
+    <div>
+      <label for="q">搜索</label>
+      <input id="q" type="text" name="q" value="{{.Query}}" placeholder="标题或正文">
+    </div>
+    <div>
+      <label for="status">状态</label>
+      <select id="status" name="status">
+        <option value="all" {{if or (eq .Status "") (eq .Status "all")}}selected{{end}}>全部</option>
+        <option value="publish" {{if eq .Status "publish"}}selected{{end}}>已发布</option>
+        <option value="draft" {{if eq .Status "draft"}}selected{{end}}>草稿</option>
+        <option value="hidden" {{if eq .Status "hidden"}}selected{{end}}>私密</option>
+        <option value="waiting" {{if eq .Status "waiting"}}selected{{end}}>待审核</option>
+      </select>
+    </div>
+    <div>
+      <label for="type">类型</label>
+      <select id="type" name="type">
+        <option value="all" {{if or (eq .Type "") (eq .Type "all")}}selected{{end}}>全部</option>
+        <option value="post" {{if eq .Type "post"}}selected{{end}}>文章</option>
+        <option value="page" {{if eq .Type "page"}}selected{{end}}>页面</option>
+      </select>
+    </div>
+    <div style="flex:0 0 auto;align-self:end">
+      <button class="btn" type="submit">筛选</button>
+    </div>
+  </div>
+</form>
+
+<div class="panel">
+  {{if .Posts}}
+  <table>
+    <thead><tr><th>标题</th><th>类型</th><th>状态</th><th>作者</th><th>发布</th><th>浏览</th><th></th></tr></thead>
+    <tbody>
+    {{range .Posts}}
+      <tr>
+        <td>
+          <a href="/admin/posts/{{.ID}}/edit">{{.Title}}</a>
+          <div class="muted">/{{.Slug}}</div>
+        </td>
+        <td>{{typeText .Type}}</td>
+        <td>{{statusText .Status}}</td>
+        <td>{{.Author}}</td>
+        <td class="muted">{{datePtr .PublishedAt}}</td>
+        <td class="muted">{{.Views}}</td>
+        <td class="actions">
+          <a href="/admin/posts/{{.ID}}/edit">编辑</a>
+          {{if eq .Status "publish"}}<a href="/article/{{.Slug}}" target="_blank" rel="noopener">查看</a>{{end}}
+        </td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="muted">没有符合条件的文章。</p>
+  {{end}}
+
+  {{if gt .TotalPages 1}}
+  <div class="pager">
+    {{if .HasPrev}}<a href="/admin/posts?page={{.PrevPage}}&status={{.Status}}&type={{.Type}}&q={{.Query}}">← 上一页</a>{{end}}
+    <span>{{.Page}} / {{.TotalPages}} · 共 {{.Total}} 篇</span>
+    {{if .HasNext}}<a href="/admin/posts?page={{.NextPage}}&status={{.Status}}&type={{.Type}}&q={{.Query}}">下一页 →</a>{{end}}
+  </div>
+  {{else}}
+  <p class="muted" style="margin-top:14px">共 {{.Total}} 篇</p>
+  {{end}}
+</div>
+{{end}}

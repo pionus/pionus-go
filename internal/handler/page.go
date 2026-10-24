@@ -1,9 +1,7 @@
 package handler
 
 import (
-	"bytes"
 	"errors"
-	"html/template"
 	"log/slog"
 	"math"
 	"strconv"
@@ -11,11 +9,9 @@ import (
 	"unicode/utf8"
 
 	"github.com/pionus/arry"
+	"github.com/pionus/pionus-go/internal/content"
 	"github.com/pionus/pionus-go/internal/model"
 	"github.com/pionus/pionus-go/internal/store"
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/extension"
-	"github.com/yuin/goldmark/renderer/html"
 )
 
 // YearGroup holds posts grouped by year for the archive page.
@@ -29,11 +25,6 @@ type YearGroup struct {
 func (g YearGroup) Articles() []*model.Post {
 	return g.Posts
 }
-
-var markdown = goldmark.New(
-	goldmark.WithExtensions(extension.GFM),
-	goldmark.WithRendererOptions(html.WithUnsafe()),
-)
 
 func Index(db store.Store) arry.Handler {
 	return func(ctx arry.Context) {
@@ -132,11 +123,6 @@ func ArticleDetail(db store.Store) arry.Handler {
 			return
 		}
 
-		var buf bytes.Buffer
-		if err := markdown.Convert([]byte(post.Content), &buf); err != nil {
-			slog.Error("markdown render", "slug", slug, "err", err)
-		}
-
 		plain := model.PlainText(post.Content)
 		readingTime := int(math.Ceil(float64(utf8.RuneCountInString(plain)) / 200.0))
 		if readingTime < 1 {
@@ -152,7 +138,7 @@ func ArticleDetail(db store.Store) arry.Handler {
 
 		ctx.Render(200, "article.html", map[string]interface{}{
 			"Article":         post,
-			"RenderedContent": template.HTML(buf.String()),
+			"RenderedContent": content.RenderMarkdown(post.Content),
 			"ReadingTime":     readingTime,
 			"Prev":            prev,
 			"Next":            next,

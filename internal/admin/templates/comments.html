@@ -1,0 +1,79 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<div class="page-head">
+  <h1>评论</h1>
+  <span class="muted">共 {{.Total}} 条</span>
+</div>
+
+<div class="tabs">
+  <a href="/admin/comments?status=pending" {{if eq .Status "pending"}}class="active"{{end}}>待审核</a>
+  <a href="/admin/comments?status=approved" {{if eq .Status "approved"}}class="active"{{end}}>已通过</a>
+  <a href="/admin/comments?status=spam" {{if eq .Status "spam"}}class="active"{{end}}>垃圾</a>
+  <a href="/admin/comments?status=all" {{if eq .Status "all"}}class="active"{{end}}>全部</a>
+</div>
+
+{{if .Comments}}
+  {{range .Comments}}
+  <div class="comment">
+    <div class="meta">
+      {{.Author}}
+      {{if .Email}} · {{.Email}}{{end}}
+      · {{datetime .CreatedAt}}
+      · 《<a href="/admin/posts/{{.PostID}}/edit">{{.PostTitle}}</a>》
+      · {{commentStatusText .Status}}
+    </div>
+    <div class="body">{{.Content}}</div>
+    <div class="actions" style="margin-top:12px">
+      {{if ne .Status "approved"}}
+      <form class="inline" method="post" action="/admin/comments/status">
+        <input type="hidden" name="_csrf" value="{{$.CSRF}}">
+        <input type="hidden" name="id" value="{{.ID}}">
+        <input type="hidden" name="action" value="approved">
+        <input type="hidden" name="filter" value="{{$.Status}}">
+        <input type="hidden" name="page" value="{{$.Page}}">
+        <button class="btn small primary" type="submit">通过</button>
+      </form>
+      {{end}}
+      {{if ne .Status "pending"}}
+      <form class="inline" method="post" action="/admin/comments/status">
+        <input type="hidden" name="_csrf" value="{{$.CSRF}}">
+        <input type="hidden" name="id" value="{{.ID}}">
+        <input type="hidden" name="action" value="pending">
+        <input type="hidden" name="filter" value="{{$.Status}}">
+        <input type="hidden" name="page" value="{{$.Page}}">
+        <button class="btn small" type="submit">待审核</button>
+      </form>
+      {{end}}
+      {{if ne .Status "spam"}}
+      <form class="inline" method="post" action="/admin/comments/status">
+        <input type="hidden" name="_csrf" value="{{$.CSRF}}">
+        <input type="hidden" name="id" value="{{.ID}}">
+        <input type="hidden" name="action" value="spam">
+        <input type="hidden" name="filter" value="{{$.Status}}">
+        <input type="hidden" name="page" value="{{$.Page}}">
+        <button class="btn small" type="submit">标记垃圾</button>
+      </form>
+      {{end}}
+      <form class="inline" method="post" action="/admin/comments/delete">
+        <input type="hidden" name="_csrf" value="{{$.CSRF}}">
+        <input type="hidden" name="id" value="{{.ID}}">
+        <input type="hidden" name="filter" value="{{$.Status}}">
+        <input type="hidden" name="page" value="{{$.Page}}">
+        <button class="btn small danger" type="submit" onclick="return confirm('删除这条评论？')">删除</button>
+      </form>
+    </div>
+  </div>
+  {{end}}
+
+  {{if gt .TotalPages 1}}
+  <div class="pager">
+    {{if .HasPrev}}<a href="/admin/comments?status={{.Status}}&page={{.PrevPage}}">← 上一页</a>{{end}}
+    <span>{{.Page}} / {{.TotalPages}}</span>
+    {{if .HasNext}}<a href="/admin/comments?status={{.Status}}&page={{.NextPage}}">下一页 →</a>{{end}}
+  </div>
+  {{end}}
+{{else}}
+  <div class="panel"><p class="muted">没有评论。</p></div>
+{{end}}
+{{end}}

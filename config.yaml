@@ -6,6 +6,15 @@ theme: default
 database:
   path: "./data/pionus.db"
 
+upload:
+  dir: "./uploads"
+  max_size_mb: 10
+
+session:
+  cookie_name: "pionus_session"
+  ttl_hours: 168
+  secure: false
+
 tls:
   cert: ""
   key: ""

@@ -1,0 +1,58 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<div class="page-head">
+  <h1>媒体库</h1>
+  <span class="muted">共 {{.Total}} 个文件</span>
+</div>
+
+{{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+
+<div class="panel">
+  <h2>上传文件</h2>
+  <form method="post" action="/admin/media/upload" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf" value="{{.CSRF}}">
+    <div class="row">
+      <div>
+        <label for="file">选择文件</label>
+        <input id="file" type="file" name="file" required>
+      </div>
+      <div style="flex:0 0 auto;align-self:end">
+        <button class="btn primary" type="submit">上传</button>
+      </div>
+    </div>
+    <p class="muted">支持图片、PDF、ZIP 和文本文件。上传后可在文章中引用。</p>
+  </form>
+</div>
+
+{{if .Media}}
+<div class="media-grid">
+  {{range .Media}}
+  <div class="media-card">
+    {{if contains .MIME "image/"}}
+    <a href="/uploads/{{.Path}}" target="_blank" rel="noopener"><img src="/uploads/{{.Path}}" alt="{{.Filename}}" loading="lazy"></a>
+    {{else}}
+    <div style="height:110px;display:grid;place-items:center;background:var(--bg);border-radius:6px">{{.MIME}}</div>
+    {{end}}
+    <code>![{{.Filename}}](/uploads/{{.Path}})</code>
+    <div class="muted">{{.Size}} B · {{date .CreatedAt}}</div>
+    <form method="post" action="/admin/media/delete" style="margin-top:8px">
+      <input type="hidden" name="_csrf" value="{{$.CSRF}}">
+      <input type="hidden" name="id" value="{{.ID}}">
+      <button class="btn small danger" type="submit" onclick="return confirm('删除这个文件？引用它的文章会出现失效链接。')">删除</button>
+    </form>
+  </div>
+  {{end}}
+</div>
+
+{{if gt .TotalPages 1}}
+<div class="pager">
+  {{if .HasPrev}}<a href="/admin/media?page={{.PrevPage}}">← 上一页</a>{{end}}
+  <span>{{.Page}} / {{.TotalPages}}</span>
+  {{if .HasNext}}<a href="/admin/media?page={{.NextPage}}">下一页 →</a>{{end}}
+</div>
+{{end}}
+{{else}}
+<div class="panel"><p class="muted">还没有上传文件。</p></div>
+{{end}}
+{{end}}

@@ -1,0 +1,156 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<div class="page-head">
+  <h1>{{if .IsNew}}写文章{{else}}编辑文章{{end}}</h1>
+  <div class="actions">
+    {{if not .IsNew}}<a href="/admin/posts">返回列表</a>{{end}}
+    {{if and (not .IsNew) (eq .Post.Status "publish")}}<a href="/article/{{.Post.Slug}}" target="_blank" rel="noopener">查看页面</a>{{end}}
+  </div>
+</div>
+
+{{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+
+<form id="editor-form" method="post" action="{{if .IsNew}}/admin/posts{{else}}/admin/posts/{{.Post.ID}}{{end}}">
+  <input type="hidden" name="_csrf" value="{{.CSRF}}">
+  <div class="editor">
+    <div>
+      <div class="panel">
+        <div class="field">
+          <label for="title">标题</label>
+          <input id="title" type="text" name="title" value="{{.Post.Title}}" required autofocus>
+        </div>
+        <div class="field">
+          <label for="slug">Slug（URL 标识）</label>
+          {{if .IsNew}}
+          <input id="slug" type="text" name="slug" value="{{.Post.Slug}}" placeholder="留空则根据标题生成">
+          {{else}}
+          <input id="slug" type="text" value="{{.Post.Slug}}" readonly>
+          <div class="muted">已发布的 slug 暂不支持修改，避免旧链接失效。</div>
+          {{end}}
+        </div>
+        <div class="field">
+          <label for="content">正文（Markdown）</label>
+          <textarea id="content" name="content" required>{{.Post.Content}}</textarea>
+          <div class="actions" style="margin-top:8px">
+            <button class="btn" type="button" id="preview-btn">预览</button>
+            <span class="muted">支持 GFM 表格、代码块和原始 HTML。</span>
+          </div>
+          <div class="preview" id="preview"></div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="editor-side">
+      <div class="panel">
+        <h2>发布</h2>
+        <div class="field">
+          <label for="status">状态</label>
+          <select id="status" name="status">
+            <option value="publish" {{if eq .Post.Status "publish"}}selected{{end}}>已发布</option>
+            <option value="draft" {{if eq .Post.Status "draft"}}selected{{end}}>草稿</option>
+            <option value="hidden" {{if eq .Post.Status "hidden"}}selected{{end}}>私密</option>
+            <option value="waiting" {{if eq .Post.Status "waiting"}}selected{{end}}>待审核</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="type">类型</label>
+          <select id="type" name="type">
+            <option value="post" {{if eq .Post.Type "post"}}selected{{end}}>文章</option>
+            <option value="page" {{if eq .Post.Type "page"}}selected{{end}}>独立页面</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="published_at">发布时间</label>
+          <input id="published_at" type="datetime-local" name="published_at" value="{{datetimeLocal .Post.PublishedAt}}">
+          <div class="muted">留空则发布时自动使用当前时间；未来时间表示定时发布。</div>
+        </div>
+        <button class="btn primary" type="submit">保存</button>
+        {{if not .IsNew}}
+        <button class="btn danger" type="submit" formaction="/admin/posts/{{.Post.ID}}/delete" onclick="return confirm('确定删除这篇文章？此操作不可恢复。')">删除</button>
+        {{end}}
+      </div>
+
+      <div class="panel">
+        <h2>分类</h2>
+        {{if .Categories}}
+          {{range .Categories}}
+          <label class="check">
+            <input type="checkbox" name="category_ids" value="{{.ID}}" {{if hasCategory $.SelectedCategoryIDs .ID}}checked{{end}}>
+            {{.Name}}
+          </label>
+          {{end}}
+        {{else}}
+          <p class="muted">还没有分类，<a href="/admin/categories">去创建</a>。</p>
+        {{end}}
+
+        <div class="field" style="margin-top:14px">
+          <label for="tags">标签</label>
+          <input id="tags" type="text" name="tags" value="{{.TagsValue}}" placeholder="用逗号分隔">
+          {{if .AllTags}}
+          <div class="muted" style="margin-top:6px">已有：
+            {{range $i, $t := .AllTags}}{{if $i}} · {{end}}{{$t.Name}}{{end}}
+          </div>
+          {{end}}
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>更多</h2>
+        <div class="field">
+          <label for="excerpt">摘要</label>
+          <textarea id="excerpt" name="excerpt" style="min-height:90px">{{.Post.Excerpt}}</textarea>
+          <div class="muted">留空则自动从正文生成。</div>
+        </div>
+        <div class="field">
+          <label for="cover">封面图 URL</label>
+          <input id="cover" type="text" name="cover" value="{{.Post.Cover}}" placeholder="/uploads/...">
+        </div>
+        <div class="field">
+          <label for="password">访问密码</label>
+          <input id="password" type="text" name="password" value="{{.Post.PostPassword}}" placeholder="留空表示公开">
+        </div>
+        <label class="check">
+          <input type="checkbox" name="allow_comment" value="1" {{if .Post.AllowComment}}checked{{end}}>
+          允许评论
+        </label>
+        <label class="check">
+          <input type="checkbox" name="pinned" value="1" {{if .Post.Pinned}}checked{{end}}>
+          置顶
+        </label>
+      </div>
+    </aside>
+  </div>
+</form>
+
+<script>
+(function () {
+  const button = document.getElementById('preview-btn');
+  const output = document.getElementById('preview');
+  const textarea = document.getElementById('content');
+  if (!button || !output || !textarea) return;
+
+  button.addEventListener('click', async function () {
+    button.disabled = true;
+    try {
+      const body = new URLSearchParams();
+      body.set('_csrf', {{.CSRF}});
+      body.set('content', textarea.value);
+      const res = await fetch('/admin/preview', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: body
+      });
+      output.innerHTML = res.ok ? await res.text() : '预览失败';
+      output.classList.add('open');
+    } catch (err) {
+      output.textContent = '预览失败';
+      output.classList.add('open');
+    } finally {
+      button.disabled = false;
+    }
+  });
+})();
+</script>
+{{end}}

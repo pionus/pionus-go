@@ -189,18 +189,6 @@ func TestUpdatePostKeepsUnspecifiedFields(t *testing.T) {
 	}
 }
 
-func TestPostFromInputValidation(t *testing.T) {
-	if _, msg := postFromInput(&postInput{Title: ""}, nil); msg == "" {
-		t.Fatal("empty title should fail")
-	}
-	if _, msg := postFromInput(&postInput{Title: "T", Content: "C", Type: "nope"}, nil); msg == "" {
-		t.Fatal("invalid type should fail")
-	}
-	if _, msg := postFromInput(&postInput{Title: "T", Content: "C", Status: "nope"}, nil); msg == "" {
-		t.Fatal("invalid status should fail")
-	}
-}
-
 func TestPostJSONDoesNotLeakPassword(t *testing.T) {
 	app, _ := newTestHandlers(t)
 

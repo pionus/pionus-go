@@ -1,0 +1,75 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<h1>分类</h1>
+
+<div class="panel">
+  <h2>新建分类</h2>
+  <form method="post" action="/admin/categories/create">
+    <input type="hidden" name="_csrf" value="{{.CSRF}}">
+    <div class="row">
+      <div>
+        <label for="new-name">名称</label>
+        <input id="new-name" type="text" name="name" required>
+      </div>
+      <div>
+        <label for="new-slug">Slug</label>
+        <input id="new-slug" type="text" name="slug" placeholder="留空自动生成">
+      </div>
+      <div>
+        <label for="new-parent">父分类</label>
+        <select id="new-parent" name="parent_id">
+          <option value="">无</option>
+          {{range .Categories}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+        </select>
+      </div>
+      <div>
+        <label for="new-sort">排序</label>
+        <input id="new-sort" type="number" name="sort_order" value="0">
+      </div>
+    </div>
+    <div class="field">
+      <label for="new-desc">描述</label>
+      <input id="new-desc" type="text" name="description">
+    </div>
+    <button class="btn primary" type="submit">创建</button>
+  </form>
+</div>
+
+<div class="panel">
+  <h2>全部分类</h2>
+  {{if .Categories}}
+  {{range .Categories}}
+  <form id="cat-{{.ID}}" method="post" action="/admin/categories/update">
+    <input type="hidden" name="_csrf" value="{{$.CSRF}}">
+    <input type="hidden" name="original_slug" value="{{.Slug}}">
+    <input type="hidden" name="parent_id" value="{{idPtr .ParentID}}">
+  </form>
+  {{end}}
+  <table>
+    <thead><tr><th>名称</th><th>Slug</th><th>描述</th><th>排序</th><th>文章</th><th></th></tr></thead>
+    <tbody>
+    {{range .Categories}}
+      <tr>
+        <td><input form="cat-{{.ID}}" type="text" name="name" value="{{.Name}}" required></td>
+        <td><input form="cat-{{.ID}}" type="text" name="slug" value="{{.Slug}}" required></td>
+        <td><input form="cat-{{.ID}}" type="text" name="description" value="{{.Description}}"></td>
+        <td><input form="cat-{{.ID}}" type="number" name="sort_order" value="{{.SortOrder}}" style="width:80px"></td>
+        <td class="muted">{{.PostCount}}</td>
+        <td class="actions">
+          <button form="cat-{{.ID}}" class="btn small" type="submit">保存</button>
+          <form class="inline" method="post" action="/admin/categories/delete">
+            <input type="hidden" name="_csrf" value="{{$.CSRF}}">
+            <input type="hidden" name="slug" value="{{.Slug}}">
+            <button class="btn small danger" type="submit" onclick="return confirm('删除这个分类？文章不会被删除。')">删除</button>
+          </form>
+        </td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="muted">还没有分类。</p>
+  {{end}}
+</div>
+{{end}}

@@ -1,0 +1,59 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<h1>标签</h1>
+
+<div class="panel">
+  <h2>新建标签</h2>
+  <form method="post" action="/admin/tags/create">
+    <input type="hidden" name="_csrf" value="{{.CSRF}}">
+    <div class="row">
+      <div>
+        <label for="new-name">名称</label>
+        <input id="new-name" type="text" name="name" required>
+      </div>
+      <div>
+        <label for="new-slug">Slug</label>
+        <input id="new-slug" type="text" name="slug" placeholder="留空自动生成">
+      </div>
+      <div style="flex:0 0 auto;align-self:end">
+        <button class="btn primary" type="submit">创建</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="panel">
+  <h2>全部标签</h2>
+  {{if .Tags}}
+  {{range .Tags}}
+  <form id="tag-{{.ID}}" method="post" action="/admin/tags/update">
+    <input type="hidden" name="_csrf" value="{{$.CSRF}}">
+    <input type="hidden" name="original_slug" value="{{.Slug}}">
+  </form>
+  {{end}}
+  <table>
+    <thead><tr><th>名称</th><th>Slug</th><th>文章</th><th></th></tr></thead>
+    <tbody>
+    {{range .Tags}}
+      <tr>
+        <td><input form="tag-{{.ID}}" type="text" name="name" value="{{.Name}}" required></td>
+        <td><input form="tag-{{.ID}}" type="text" name="slug" value="{{.Slug}}" required></td>
+        <td class="muted">{{.PostCount}}</td>
+        <td class="actions">
+          <button form="tag-{{.ID}}" class="btn small" type="submit">保存</button>
+          <form class="inline" method="post" action="/admin/tags/delete">
+            <input type="hidden" name="_csrf" value="{{$.CSRF}}">
+            <input type="hidden" name="slug" value="{{.Slug}}">
+            <button class="btn small danger" type="submit" onclick="return confirm('删除这个标签？文章不会被删除。')">删除</button>
+          </form>
+        </td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="muted">还没有标签。</p>
+  {{end}}
+</div>
+{{end}}

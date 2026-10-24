@@ -63,12 +63,27 @@ pionus-go/
 │   │   ├── user.go
 │   │   ├── media.go
 │   │   └── option.go             # Options + redirects
+│   ├── content/
+│   │   ├── post.go               # Shared post input validation
+│   │   └── markdown.go           # Shared goldmark renderer
+│   ├── auth/
+│   │   └── auth.go               # bcrypt, sessions, RequireUser
+│   ├── admin/
+│   │   ├── admin.go              # Admin router, embedded templates, helpers
+│   │   ├── auth_handlers.go      # Setup, login, logout
+│   │   ├── posts.go              # Post list/editor/delete/preview
+│   │   ├── taxonomy.go           # Categories and tags
+│   │   ├── dashboard.go          # Dashboard and comment moderation
+│   │   ├── media.go              # Uploads and media library
+│   │   ├── settings.go           # Site settings
+│   │   └── templates/            # Server-rendered admin UI (go:embed)
 │   ├── handler/
 │   │   ├── post.go               # JSON API
 │   │   └── page.go               # SSR pages
 │   └── migrate/
 │       └── markdown.go           # Legacy markdown import
 ├── markdowns/                    # Legacy markdown files
+├── uploads/                      # Uploaded media (runtime)
 ├── theme/                        # Frontend theme (git submodule)
 ├── Dockerfile
 └── Makefile
@@ -84,8 +99,15 @@ server:
 theme: default
 database:
   path: "./data/pionus.db"
+upload:
+  dir: "./uploads"
+  max_size_mb: 10
+session:
+  cookie_name: "pionus_session"
+  ttl_hours: 168
+  secure: false   # true when served over HTTPS
 tls:
-  cert: ""     # when set, arry uses Let's Encrypt autocert for these domains
+  cert: ""        # when set, arry uses Let's Encrypt autocert for these domains
   key: ""
 ```
 
@@ -96,6 +118,12 @@ Environment overrides:
 | `PIONUS_AUTH_TOKEN` | Token for write API calls |
 | `PIONUS_ADDR` | Listen address |
 | `PIONUS_DB_PATH` | SQLite file path |
+| `PIONUS_UPLOAD_DIR` | Upload directory |
+| `PIONUS_UPLOAD_MAX_MB` | Max upload size |
+| `PIONUS_SESSION_COOKIE` | Session cookie name |
+| `PIONUS_SESSION_TTL_HOURS` | Session lifetime |
+| `PIONUS_SESSION_SECURE` | Mark cookies Secure (`1`/`true`) |
+| `PIONUS_ADMIN_PASSWORD` | Password for `-create-admin` |
 
 Site settings (title, author, posts per page, comment switches) live in the
 `options` table, seeded by the first migration. This mirrors Typecho's
@@ -105,8 +133,9 @@ Site settings (title, author, posts per page, comment switches) live in the
 
 ### JSON API
 
-Writes require `Authorization: <token>` or `Authorization: Bearer <token>`.
-The aliases under `/api/articles` are kept for compatibility.
+Writes require `Authorization: <token>` or `Authorization: Bearer <token>`, or
+an authenticated admin session. The aliases under `/api/articles` are kept for
+compatibility.
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
@@ -115,6 +144,35 @@ The aliases under `/api/articles` are kept for compatibility.
 | POST | `/api/posts` | Yes | Create a post |
 | PUT | `/api/posts/:slug` | Yes | Update a post |
 | DELETE | `/api/posts/:slug` | Yes | Delete a post |
+
+### Admin UI
+
+Mounted at `/admin`. Sessions use an HttpOnly cookie backed by the `sessions`
+table; all POSTs require a CSRF token (double-submit cookie). The admin engine
+serves templates embedded in the binary.
+
+| Method | Path | Description |
+|---|---|---|
+| GET/POST | `/admin/setup` | First-run owner account (only while no users exist) |
+| GET/POST | `/admin/login` | Sign in |
+| POST | `/admin/logout` | Sign out |
+| GET | `/admin` | Dashboard |
+| GET | `/admin/posts` | Post list with filters |
+| GET/POST | `/admin/posts/new` | Create a post |
+| GET | `/admin/posts/:id/edit` | Edit a post |
+| POST | `/admin/posts/:id` | Save a post |
+| POST | `/admin/posts/:id/delete` | Delete a post |
+| POST | `/admin/preview` | Render Markdown fragment for the editor preview |
+| GET | `/admin/categories`, `/admin/tags` | Taxonomy management |
+| GET | `/admin/comments` | Comment moderation |
+| GET | `/admin/media` | Media library and upload |
+| GET/POST | `/admin/settings` | Site settings |
+
+Bootstrap without the browser:
+
+```bash
+./pionus -create-admin admin -admin-password 'change-me-please'
+```
 
 ### SSR Pages
 
@@ -130,6 +188,7 @@ The aliases under `/api/articles` are kept for compatibility.
 - `/assets` → `./theme/{theme}/assets`
 - `/node_modules` → `./theme/{theme}/node_modules`
 - `/web_modules` → `./theme/{theme}/web_modules`
+- `/uploads` → `upload.dir`
 
 ## Data Model
 
@@ -187,32 +246,41 @@ docker run -p 8087:8087 -e PIONUS_AUTH_TOKEN=secret \
   -v "$PWD/data:/app/data" -v "$PWD/uploads:/app/uploads" pionus
 ```
 
-The image runs as UID 10001 and uses `go.mod` (not `go.work`) to build.
+The image runs as UID 10001 and uses `go.mod` (not `go.work`) to build. On
+first visit open `/admin/setup`, or create the owner from the CLI before
+starting the server.
 
 ## Development Guidelines
 
-1. **New route**: handler in `internal/handler/`, register in `main.go`.
-2. **New storage method**: add to the relevant interface in `store.go`, then
+1. **New route**: handler in `internal/handler/` (public) or
+   `internal/admin/` (admin), register in `main.go` or `admin.Register`.
+2. **Shared content rules** (slug/status validation, excerpt generation) belong
+   in `internal/content`, not duplicated between API and admin.
+3. **New storage method**: add to the relevant interface in `store.go`, then
    implement in the matching file; always update tests.
-3. **Schema change**: add `002_*.sql`; never edit an applied migration. The
+4. **Schema change**: add `002_*.sql`; never edit an applied migration. The
    runner records versions in `schema_migrations`.
-4. **Markdown**: render through the shared goldmark instance in `page.go`.
-5. **Theme data keys**: `Articles`, `Groups`, `Article`, `RenderedContent`,
+5. **Markdown**: render through `content.RenderMarkdown` so public pages,
+   preview and future feeds stay consistent.
+6. **Theme data keys**: `Articles`, `Groups`, `Article`, `RenderedContent`,
    `ReadingTime`, `Prev`, `Next`, `CurrentPath` are consumed by the submodule.
-6. **Money path**: public listings must never expose drafts, hidden posts, or
-   scheduled posts.
+7. **Money path**: public listings must never expose drafts, hidden posts, or
+   scheduled posts; admin POSTs must always be CSRF-checked.
+8. **Uploads**: validate by sniffed MIME, never by the client filename; keep
+   the generated path relative and store it in `media.path`.
 
 ## Current Status / Next Steps
 
-Done: schema, store layer, post API, SSR pages, markdown import, WAL, build.
+Done: schema, store layer, post API, SSR pages, markdown import, WAL, build,
+bcrypt login, sessions/CSRF, first-run setup, admin UI (dashboard, editor,
+media, taxonomies, comments, settings).
 
 Pending for Typecho parity:
 
-1. Bootstrap command / first-run admin account (bcrypt + sessions + CSRF).
-2. Admin UI: dashboard, post editor, media upload, taxonomy and comment
-   moderation, settings.
-3. Typecho importer (`typecho_contents`/`metas`/`relationships`/`comments`/
+1. Public comment submission, moderation notifications and spam protection.
+2. Typecho importer (`typecho_contents`/`metas`/`relationships`/`comments`/
    `users`), `usr/uploads` migration and 301 redirect map.
-4. Permalinks matching Typecho (`/archives/:slug/`, `/category/:slug/`,
+3. Permalinks matching Typecho (`/archives/:slug/`, `/category/:slug/`,
    `/tag/:slug/`), feeds, sitemap, search.
-5. Theme rewrite in Go templates.
+4. Theme rewrite in Go templates, including category/tag/archive pages.
+5. Draft preview links for anonymous reviewers.

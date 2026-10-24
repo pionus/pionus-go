@@ -1,0 +1,72 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<h1>概览</h1>
+
+<div class="grid">
+  <div class="stat"><b>{{.Published}}</b><span>已发布</span></div>
+  <div class="stat"><b>{{.Drafts}}</b><span>草稿</span></div>
+  <div class="stat"><b>{{.PendingComments}}</b><span>待审核评论</span></div>
+  <div class="stat"><b>{{.MediaTotal}}</b><span>媒体文件</span></div>
+  <div class="stat"><b>{{.CategoryTotal}}</b><span>分类</span></div>
+  <div class="stat"><b>{{.TagTotal}}</b><span>标签</span></div>
+</div>
+
+<div class="panel">
+  <div class="page-head">
+    <h2>最近文章</h2>
+    <a class="btn primary" href="/admin/posts/new">写文章</a>
+  </div>
+  {{if .LatestPosts}}
+  <table>
+    <thead><tr><th>标题</th><th>状态</th><th>作者</th><th>时间</th><th></th></tr></thead>
+    <tbody>
+    {{range .LatestPosts}}
+      <tr>
+        <td><a href="/admin/posts/{{.ID}}/edit">{{.Title}}</a></td>
+        <td>{{statusText .Status}}</td>
+        <td>{{.Author}}</td>
+        <td class="muted">{{datetime .CreatedAt}}</td>
+        <td><a href="/admin/posts/{{.ID}}/edit">编辑</a></td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="muted">还没有文章，<a href="/admin/posts/new">写第一篇</a>。</p>
+  {{end}}
+</div>
+
+<div class="panel">
+  <h2>待审核评论</h2>
+  {{if .Pending}}
+    {{range .Pending}}
+    <div class="comment">
+      <div class="meta">{{.Author}} · {{datetime .CreatedAt}} · 《{{.PostTitle}}》</div>
+      <div class="body">{{truncate .Content 160}}</div>
+      <div class="actions" style="margin-top:10px">
+        <form class="inline" method="post" action="/admin/comments/status">
+          <input type="hidden" name="_csrf" value="{{$.CSRF}}">
+          <input type="hidden" name="id" value="{{.ID}}">
+          <input type="hidden" name="action" value="approved">
+          <input type="hidden" name="filter" value="pending">
+          <input type="hidden" name="page" value="1">
+          <button class="btn small primary" type="submit">通过</button>
+        </form>
+        <form class="inline" method="post" action="/admin/comments/status">
+          <input type="hidden" name="_csrf" value="{{$.CSRF}}">
+          <input type="hidden" name="id" value="{{.ID}}">
+          <input type="hidden" name="action" value="spam">
+          <input type="hidden" name="filter" value="pending">
+          <input type="hidden" name="page" value="1">
+          <button class="btn small" type="submit">垃圾</button>
+        </form>
+        <a href="/admin/comments?status=pending">全部待审核 →</a>
+      </div>
+    </div>
+    {{end}}
+  {{else}}
+    <p class="muted">没有待审核的评论。</p>
+  {{end}}
+</div>
+{{end}}
