@@ -391,6 +391,37 @@ func TestProfilePasswordChange(t *testing.T) {
 	}
 }
 
+func TestAdminUsers(t *testing.T) {
+	e := newTestEnv(t)
+	e.setup(t)
+
+	resp := e.postForm(t, "/admin/users/create", url.Values{
+		"username": {"writer"}, "email": {"writer@example.com"},
+		"password": {"writer-pass"}, "role": {"editor"},
+	})
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("create user status = %d", resp.StatusCode)
+	}
+	user, err := e.store.GetUserByUsername("writer")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp = e.get(t, "/admin/users")
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), "writer") {
+		t.Fatalf("users page status = %d", resp.StatusCode)
+	}
+
+	resp = e.postForm(t, "/admin/users/delete", url.Values{"id": {fmt.Sprint(user.ID)}})
+	resp.Body.Close()
+	if _, err := e.store.GetUser(user.ID); err == nil {
+		t.Fatal("user was not deleted")
+	}
+}
+
 func TestEditorCannotOpenSettings(t *testing.T) {
 	e := newTestEnv(t)
 	e.setup(t)

@@ -1,0 +1,58 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<h1>用户</h1>
+{{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+
+<div class="panel">
+  <h2>新建用户</h2>
+  <form method="post" action="/admin/users/create">
+    <input type="hidden" name="_csrf" value="{{.CSRF}}">
+    <div class="row">
+      <div><label for="username">用户名</label><input id="username" type="text" name="username" required></div>
+      <div><label for="screen_name">显示名</label><input id="screen_name" type="text" name="screen_name"></div>
+      <div><label for="email">邮箱</label><input id="email" type="email" name="email" required></div>
+    </div>
+    <div class="row">
+      <div><label for="password">密码</label><input id="password" type="password" name="password" minlength="8" required></div>
+      <div>
+        <label for="role">角色</label>
+        <select id="role" name="role">
+          <option value="editor">编辑</option>
+          <option value="admin">管理员</option>
+          <option value="contributor">投稿者</option>
+          <option value="owner">所有者</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn primary" type="submit">创建用户</button>
+  </form>
+</div>
+
+<div class="panel">
+  <h2>全部用户</h2>
+  <table>
+    <thead><tr><th>用户名</th><th>显示名</th><th>邮箱</th><th>角色</th><th>创建时间</th><th></th></tr></thead>
+    <tbody>
+    {{range .Users}}
+      <tr>
+        <td>{{.Username}}</td>
+        <td>{{.DisplayName}}</td>
+        <td>{{.Email}}</td>
+        <td>{{.Role}}</td>
+        <td class="muted">{{datetime .CreatedAt}}</td>
+        <td>
+          {{if ne .ID $.User.ID}}
+          <form class="inline" method="post" action="/admin/users/delete">
+            <input type="hidden" name="_csrf" value="{{$.CSRF}}">
+            <input type="hidden" name="id" value="{{.ID}}">
+            <button class="btn small danger" type="submit" onclick="return confirm('删除这个用户？')">删除</button>
+          </form>
+          {{end}}
+        </td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}

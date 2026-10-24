@@ -87,6 +87,9 @@ func (a *Admin) Register(app *arry.Arry) {
 	priv.Post("/logout", a.logout)
 	priv.Get("/profile", a.profilePage)
 	priv.Post("/profile", a.profileSave)
+	priv.Get("/users", a.requireManager(a.userList))
+	priv.Post("/users/create", a.requireManager(a.userCreate))
+	priv.Post("/users/delete", a.requireManager(a.userDelete))
 
 	priv.Get("/posts", a.postList)
 	priv.Get("/posts/new", a.postNew)
