@@ -93,8 +93,8 @@ func TestMigrationsAreIdempotent(t *testing.T) {
 	if rows != distinct {
 		t.Fatalf("migrations applied more than once: rows=%d distinct=%d", rows, distinct)
 	}
-	if distinct < 2 {
-		t.Fatalf("expected both migrations to be applied, got %d", distinct)
+	if distinct < 1 {
+		t.Fatalf("expected migrations to be applied, got %d", distinct)
 	}
 }
 

@@ -1,4 +1,6 @@
--- Core content model: users, posts, taxonomies, comments, media, sessions.
+-- Pionus schema. This is the baseline for fresh installs.
+-- Existing databases keep their schema_migrations history; never edit an
+-- applied migration in a deployed installation.
 
 CREATE TABLE IF NOT EXISTS users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -22,19 +24,25 @@ CREATE TABLE IF NOT EXISTS posts (
     cover         TEXT NOT NULL DEFAULT '',
     type          TEXT NOT NULL DEFAULT 'post',
     status        TEXT NOT NULL DEFAULT 'draft',
+    format        TEXT NOT NULL DEFAULT 'markdown',
+    template      TEXT NOT NULL DEFAULT '',
     author_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
     post_password TEXT NOT NULL DEFAULT '',
     allow_comment INTEGER NOT NULL DEFAULT 1,
     pinned        INTEGER NOT NULL DEFAULT 0,
     views         INTEGER NOT NULL DEFAULT 0,
+    likes         INTEGER NOT NULL DEFAULT 0,
     published_at  DATETIME,
     created_at    DATETIME NOT NULL,
-    updated_at    DATETIME NOT NULL
+    updated_at    DATETIME NOT NULL,
+    source        TEXT NOT NULL DEFAULT '',
+    source_id     TEXT NOT NULL DEFAULT ''
 );
 
 CREATE INDEX IF NOT EXISTS idx_posts_public ON posts(type, status, published_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_author ON posts(author_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_posts_source ON posts(source, source_id) WHERE source_id <> '';
 
 CREATE TABLE IF NOT EXISTS categories (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,12 +88,15 @@ CREATE TABLE IF NOT EXISTS comments (
     status     TEXT NOT NULL DEFAULT 'pending',
     ip         TEXT NOT NULL DEFAULT '',
     user_agent TEXT NOT NULL DEFAULT '',
-    created_at DATETIME NOT NULL
+    created_at DATETIME NOT NULL,
+    source     TEXT NOT NULL DEFAULT '',
+    source_id  TEXT NOT NULL DEFAULT ''
 );
 
 CREATE INDEX IF NOT EXISTS idx_comments_post ON comments(post_id, status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_comments_status ON comments(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_comments_source ON comments(source, source_id) WHERE source_id <> '';
 
 CREATE TABLE IF NOT EXISTS media (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -117,12 +128,38 @@ CREATE TABLE IF NOT EXISTS options (
     value TEXT NOT NULL DEFAULT ''
 );
 
-CREATE TABLE IF NOT EXISTS redirects (
-    from_path  TEXT PRIMARY KEY,
-    to_path    TEXT NOT NULL,
-    status     INTEGER NOT NULL DEFAULT 301,
-    created_at DATETIME NOT NULL
+CREATE TABLE IF NOT EXISTS notes (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    content    TEXT NOT NULL,
+    status     TEXT NOT NULL DEFAULT 'publish',
+    source     TEXT NOT NULL DEFAULT '',
+    source_id  TEXT NOT NULL DEFAULT '',
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_notes_created ON notes(created_at DESC, id DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_source ON notes(source, source_id) WHERE source_id <> '';
+
+CREATE VIRTUAL TABLE IF NOT EXISTS posts_fts USING fts5(
+    title,
+    content,
+    post_id UNINDEXED,
+    tokenize='trigram'
+);
+
+CREATE TRIGGER IF NOT EXISTS posts_fts_insert AFTER INSERT ON posts BEGIN
+    INSERT INTO posts_fts(post_id, title, content) VALUES (new.id, new.title, new.content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS posts_fts_update AFTER UPDATE OF title, content ON posts BEGIN
+    DELETE FROM posts_fts WHERE post_id = old.id;
+    INSERT INTO posts_fts(post_id, title, content) VALUES (new.id, new.title, new.content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS posts_fts_delete AFTER DELETE ON posts BEGIN
+    DELETE FROM posts_fts WHERE post_id = old.id;
+END;
 
 INSERT OR IGNORE INTO options (name, value) VALUES
     ('site.title', 'Secbone''s Blog'),
