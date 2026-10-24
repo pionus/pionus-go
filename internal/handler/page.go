@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -317,11 +318,33 @@ func renderArticle(ctx arry.Context, db store.Store, guard *PostGuard, slug, err
 		PostID: post.ID,
 		Status: model.CommentApproved,
 		Page:   1,
-		Limit:  500,
+		Limit:  1000,
 	})
 	if err != nil {
 		slog.Error("list comments", "post", post.ID, "err", err)
 	}
+
+	const commentPageSize = 20
+	commentPage := 1
+	if raw := ctx.Query("cpage"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+			commentPage = n
+		}
+	}
+	roots := buildCommentTree(comments)
+	commentTotalPages := (len(roots) + commentPageSize - 1) / commentPageSize
+	if commentTotalPages < 1 {
+		commentTotalPages = 1
+	}
+	if commentPage > commentTotalPages {
+		commentPage = commentTotalPages
+	}
+	start := (commentPage - 1) * commentPageSize
+	end := start + commentPageSize
+	if end > len(roots) {
+		end = len(roots)
+	}
+	pageRoots := roots[start:end]
 
 	_ = db.IncrementPostViews(slug)
 
@@ -340,8 +363,14 @@ func renderArticle(ctx arry.Context, db store.Store, guard *PostGuard, slug, err
 	data["ReadingTime"] = readingTime
 	data["Prev"] = prev
 	data["Next"] = next
-	data["Comments"] = buildCommentTree(comments)
+	data["Comments"] = pageRoots
 	data["CommentCount"] = len(comments)
+	data["CommentPage"] = commentPage
+	data["CommentTotalPages"] = commentTotalPages
+	data["CommentHasPrev"] = commentPage > 1
+	data["CommentHasNext"] = commentPage < commentTotalPages
+	data["CommentPrevURL"] = fmt.Sprintf("/article/%s?cpage=%d#comments", slug, commentPage-1)
+	data["CommentNextURL"] = fmt.Sprintf("/article/%s?cpage=%d#comments", slug, commentPage+1)
 	data["CanComment"] = canComment
 	data["CSRF"] = csrfToken(ctx)
 	data["CommentAction"] = "/article/" + slug + "/comment"

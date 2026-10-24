@@ -66,8 +66,8 @@ func (s *SQLiteStore) ListComments(f CommentFilter) ([]*model.Comment, int, erro
 	if f.Limit < 1 {
 		f.Limit = 20
 	}
-	if f.Limit > 200 {
-		f.Limit = 200
+	if f.Limit > 1000 {
+		f.Limit = 1000
 	}
 
 	where := ""
