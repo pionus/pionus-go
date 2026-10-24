@@ -130,8 +130,8 @@ func main() {
 	}))
 	app.Use(session.Middleware())
 
-	app.StaticFS("/assets", web.AssetsFS())
-	app.Static("/uploads", cfg.Upload.Dir)
+	app.StaticFSWithConfig("/assets", web.AssetsFS(), arry.StaticConfig{MaxAge: time.Hour})
+	app.StaticWithConfig("/uploads", arry.StaticConfig{Dir: cfg.Upload.Dir, MaxAge: 24 * time.Hour})
 	app.ViewsWithConfig(web.EngineConfig())
 
 	if cfg.AuthToken == "" {
