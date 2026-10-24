@@ -46,6 +46,8 @@ var commentPolicy = func() *bluemonday.Policy {
 	return p
 }()
 
+var commentLimits = newRateLimiter(5, 10*time.Minute)
+
 var smileRe = regexp.MustCompile(`\{smile:(\d+)\}`)
 
 var smileEmojis = []string{
@@ -202,6 +204,13 @@ func PostComment(db store.Store) arry.Handler {
 		status := model.CommentApproved
 		if moderationRequired(db) {
 			status = model.CommentPending
+		}
+
+		if ip := ctx.ClientIP(); !commentLimits.Allow(ip) {
+			renderArticle(ctx, db, slug, "评论太频繁，请稍后再试。", form)
+			return
+		} else {
+			commentLimits.Record(ip)
 		}
 
 		comment := &model.Comment{
