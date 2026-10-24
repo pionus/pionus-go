@@ -41,7 +41,7 @@ func TestFixLinks(t *testing.T) {
 		t.Fatal(err)
 	}
 	comment := &model.Comment{
-		PostID: post.ID, Author: "A", Content: "link /index.php/archives/10/",
+		PostID: post.ID, Author: "A", Content: "link /index.php/archives/10/", Source: Source,
 	}
 	if err := db.CreateComment(comment); err != nil {
 		t.Fatal(err)
@@ -79,6 +79,27 @@ func TestFixLinks(t *testing.T) {
 	}
 	if strings.Contains(gotComment.Content, "/index.php/") || !strings.Contains(gotComment.Content, "/article/archives-10") {
 		t.Fatalf("comment = %q", gotComment.Content)
+	}
+
+	// Newly authored content must not be rewritten.
+	newPost := &model.Post{Slug: "new", Title: "New", Status: model.StatusPublish, Content: "/index.php/archives/10/"}
+	if err := db.CreatePost(newPost); err != nil {
+		t.Fatal(err)
+	}
+	newComment := &model.Comment{PostID: newPost.ID, Author: "A", Content: "/index.php/archives/10/"}
+	if err := db.CreateComment(newComment); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := FixLinks(db, false); err != nil {
+		t.Fatal(err)
+	}
+	kept, _ := db.GetPost("new")
+	if !strings.Contains(kept.Content, "/index.php/") {
+		t.Fatalf("new post was rewritten: %q", kept.Content)
+	}
+	keptComment, _ := db.GetComment(newComment.ID)
+	if !strings.Contains(keptComment.Content, "/index.php/") {
+		t.Fatalf("new comment was rewritten: %q", keptComment.Content)
 	}
 
 	// Second pass is a no-op.

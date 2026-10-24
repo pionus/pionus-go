@@ -60,6 +60,9 @@ func FixLinks(db store.Store, dryRun bool) (*FixReport, error) {
 			return nil, fmt.Errorf("list posts for link repair: %w", err)
 		}
 		for _, p := range posts {
+			if p.Source != Source {
+				continue
+			}
 			report.PostsScanned++
 			fixed := linker.Rewrite(p.Content)
 			if fixed != p.Content {
@@ -89,6 +92,9 @@ func FixLinks(db store.Store, dryRun bool) (*FixReport, error) {
 			return nil, fmt.Errorf("list comments for link repair: %w", err)
 		}
 		for _, c := range comments {
+			if c.Source != Source {
+				continue
+			}
 			report.CommentsScanned++
 			fixed := linker.Rewrite(c.Content)
 			if fixed != c.Content {
