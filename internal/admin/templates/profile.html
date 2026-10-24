@@ -1,0 +1,32 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<h1>个人资料</h1>
+
+{{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+
+<div class="panel">
+  <h2>{{.ProfileUser.DisplayName}}</h2>
+  <p class="muted">{{.ProfileUser.Username}} · {{.ProfileUser.Email}} · {{.ProfileUser.Role}}</p>
+</div>
+
+<div class="panel">
+  <h2>修改密码</h2>
+  <form method="post" action="/admin/profile">
+    <input type="hidden" name="_csrf" value="{{.CSRF}}">
+    <div class="field">
+      <label for="current_password">当前密码</label>
+      <input id="current_password" type="password" name="current_password" required autocomplete="current-password">
+    </div>
+    <div class="field">
+      <label for="password">新密码</label>
+      <input id="password" type="password" name="password" minlength="8" required autocomplete="new-password">
+    </div>
+    <div class="field">
+      <label for="confirm">确认新密码</label>
+      <input id="confirm" type="password" name="confirm" minlength="8" required autocomplete="new-password">
+    </div>
+    <button class="btn primary" type="submit">保存密码</button>
+  </form>
+</div>
+{{end}}

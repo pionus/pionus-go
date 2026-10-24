@@ -93,7 +93,7 @@ footer{max-width:1120px;margin:0 auto;padding:0 24px 40px;color:var(--muted);fon
     <a href="/admin/settings" {{if contains .Path "/settings"}}class="active"{{end}}>设置</a>
   </nav>
   <div class="me">
-    <span>{{.User.DisplayName}}</span>
+    <a href="/admin/profile">{{.User.DisplayName}}</a>
     <a href="/" target="_blank" rel="noopener">查看站点</a>
     <form method="post" action="/admin/logout">
       <input type="hidden" name="_csrf" value="{{.CSRF}}">

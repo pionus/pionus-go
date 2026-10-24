@@ -365,6 +365,63 @@ func TestSettingsSave(t *testing.T) {
 	}
 }
 
+func TestProfilePasswordChange(t *testing.T) {
+	e := newTestEnv(t)
+	e.setup(t)
+
+	resp := e.postForm(t, "/admin/profile", url.Values{
+		"current_password": {"password123"},
+		"password":         {"new-password-123"},
+		"confirm":          {"new-password-123"},
+	})
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("profile status = %d", resp.StatusCode)
+	}
+
+	user, err := e.store.GetUserByUsername("admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !auth.CheckPassword(user.PasswordHash, "new-password-123") {
+		t.Fatal("new password was not saved")
+	}
+	if auth.CheckPassword(user.PasswordHash, "password123") {
+		t.Fatal("old password still works")
+	}
+}
+
+func TestEditorCannotOpenSettings(t *testing.T) {
+	e := newTestEnv(t)
+	e.setup(t)
+
+	hash, err := auth.HashPassword("editor-pass")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.store.CreateUser(&model.User{
+		Username: "editor", Email: "editor@example.com", PasswordHash: hash,
+		Role: model.RoleEditor,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Fresh client for the editor.
+	jar, _ := cookiejar.New(nil)
+	editor := &testEnv{server: e.server, client: &http.Client{Jar: jar, CheckRedirect: func(req *http.Request, via []*http.Request) error { return http.ErrUseLastResponse }}, store: e.store, base: e.base, jar: jar}
+	resp := editor.postForm(t, "/admin/login", url.Values{"username": {"editor"}, "password": {"editor-pass"}})
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("editor login status = %d", resp.StatusCode)
+	}
+
+	resp = editor.get(t, "/admin/settings")
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("editor settings status = %d, want 403", resp.StatusCode)
+	}
+}
+
 func TestAdminNotes(t *testing.T) {
 	e := newTestEnv(t)
 	e.setup(t)

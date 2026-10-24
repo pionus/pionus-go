@@ -85,6 +85,8 @@ func (a *Admin) Register(app *arry.Arry) {
 	priv := arry.NewRouter(bodyLimit, csrf, a.auth.RequireUser)
 	priv.Get("/", a.dashboard)
 	priv.Post("/logout", a.logout)
+	priv.Get("/profile", a.profilePage)
+	priv.Post("/profile", a.profileSave)
 
 	priv.Get("/posts", a.postList)
 	priv.Get("/posts/new", a.postNew)
@@ -116,8 +118,8 @@ func (a *Admin) Register(app *arry.Arry) {
 	priv.Post("/media/upload", a.mediaUpload)
 	priv.Post("/media/delete", a.mediaDelete)
 
-	priv.Get("/settings", a.settingsPage)
-	priv.Post("/settings", a.settingsSave)
+	priv.Get("/settings", a.requireManager(a.settingsPage))
+	priv.Post("/settings", a.requireManager(a.settingsSave))
 
 	app.Router().Graft(auth.AdminBase, priv)
 }
