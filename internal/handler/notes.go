@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"errors"
 	"html/template"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/pionus/arry"
 	"github.com/pionus/pionus-go/internal/content"
@@ -17,6 +19,34 @@ type noteView struct {
 }
 
 // NotesPage renders the 微语 timeline.
+// NoteDetail renders one 微语 entry at /notes/:id.
+func NoteDetail(db store.Store) arry.Handler {
+	return func(ctx arry.Context) {
+		id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+		if err != nil || id <= 0 {
+			notFound(ctx, db, "微语不存在")
+			return
+		}
+		note, err := db.GetNote(id)
+		if err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				notFound(ctx, db, "微语不存在")
+				return
+			}
+			ctx.Reply(http.StatusInternalServerError)
+			return
+		}
+		if note.Status != model.StatusPublish {
+			notFound(ctx, db, "微语不存在")
+			return
+		}
+		data := baseData(ctx, db, "微语")
+		data["Note"] = note
+		data["HTML"] = content.RenderNote(note.Content)
+		ctx.Render(http.StatusOK, "note.html", data)
+	}
+}
+
 func NotesPage(db store.Store) arry.Handler {
 	return func(ctx arry.Context) {
 		const limit = 30

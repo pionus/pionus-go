@@ -107,6 +107,8 @@ func (a *Admin) Register(app *arry.Arry) {
 	priv.Post("/tags/delete", a.tagDelete)
 
 	priv.Get("/notes", a.noteList)
+	priv.Get("/notes/:id/edit", a.noteEditPage)
+	priv.Post("/notes/:id", a.noteUpdate)
 	priv.Post("/notes/create", a.noteCreate)
 	priv.Post("/notes/delete", a.noteDelete)
 

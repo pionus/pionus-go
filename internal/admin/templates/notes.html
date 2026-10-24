@@ -25,6 +25,9 @@
   <div class="comment" style="margin-bottom:12px">
     <div class="meta">{{datetime .CreatedAt}}</div>
     <div class="body" style="white-space:pre-wrap">{{.Content}}</div>
+    <div class="actions" style="margin-top:8px">
+      <a href="/admin/notes/{{.ID}}/edit">编辑</a>
+    </div>
     <form class="inline" method="post" action="/admin/notes/delete" style="margin-top:8px">
       <input type="hidden" name="_csrf" value="{{$.CSRF}}">
       <input type="hidden" name="id" value="{{.ID}}">

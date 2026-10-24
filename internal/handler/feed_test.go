@@ -70,6 +70,27 @@ func TestRobotsAndSitemap(t *testing.T) {
 	}
 }
 
+func TestNotesFeed(t *testing.T) {
+	db := newFeedStore(t)
+	if err := db.SetOption("site.url", "https://example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.CreateNote(&model.Note{Content: "一条微语"}); err != nil {
+		t.Fatal(err)
+	}
+
+	app := arry.New()
+	app.Router().Get("/feed/notes", NotesFeed(db))
+	rec := feedRequest(app, "/feed/notes")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "一条微语") || !strings.Contains(body, "/notes/") {
+		t.Fatalf("notes feed = %s", body)
+	}
+}
+
 func TestFeedSkipsPasswordPosts(t *testing.T) {
 	db := newFeedStore(t)
 	if err := db.SetOption("site.url", "https://example.com"); err != nil {

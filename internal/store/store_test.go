@@ -440,6 +440,14 @@ func TestNotes(t *testing.T) {
 		t.Fatalf("count=%d err=%v", count, err)
 	}
 
+	if err := s.UpdateNote(n.ID, "修改后的微语", model.StatusHidden); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := s.GetNote(n.ID)
+	if err != nil || updated.Content != "修改后的微语" || updated.Status != model.StatusHidden {
+		t.Fatalf("updated note = %+v err=%v", updated, err)
+	}
+
 	if err := s.DeleteNote(n.ID); err != nil {
 		t.Fatal(err)
 	}

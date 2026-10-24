@@ -3,6 +3,7 @@ package admin
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -42,6 +43,63 @@ func (a *Admin) noteList(ctx arry.Context) {
 		data["Error"] = "微语最多 2000 个字符。"
 	}
 	a.render(ctx, http.StatusOK, "notes.html", data)
+}
+
+func (a *Admin) noteEditPage(ctx arry.Context) {
+	id := atoiDefault(ctx.Param("id"), 0)
+	if id <= 0 {
+		ctx.Reply(http.StatusNotFound)
+		return
+	}
+	note, err := a.store.GetNote(int64(id))
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			ctx.Reply(http.StatusNotFound)
+			return
+		}
+		logErr("admin load note", "id", id, "err", err)
+		ctx.Reply(http.StatusInternalServerError)
+		return
+	}
+	data := a.base(ctx, "编辑微语")
+	data["Note"] = note
+	switch ctx.Query("error") {
+	case "empty":
+		data["Error"] = "内容不能为空。"
+	case "too_long":
+		data["Error"] = "最多 2000 个字符。"
+	case "save":
+		data["Error"] = "保存失败，请稍后再试。"
+	}
+	a.render(ctx, http.StatusOK, "note-edit.html", data)
+}
+
+func (a *Admin) noteUpdate(ctx arry.Context) {
+	id := atoiDefault(ctx.Param("id"), 0)
+	if id <= 0 {
+		ctx.Reply(http.StatusNotFound)
+		return
+	}
+	form := ctx.Request()
+	content := strings.TrimSpace(form.PostFormValue("content"))
+	if content == "" {
+		a.redirect(ctx, "/admin/notes/"+strconv.Itoa(id)+"/edit?error=empty")
+		return
+	}
+	if utf8.RuneCountInString(content) > 2000 {
+		a.redirect(ctx, "/admin/notes/"+strconv.Itoa(id)+"/edit?error=too_long")
+		return
+	}
+	status := form.PostFormValue("status")
+	if status != model.StatusHidden {
+		status = model.StatusPublish
+	}
+	if err := a.store.UpdateNote(int64(id), content, status); err != nil {
+		logErr("admin update note", "id", id, "err", err)
+		a.redirect(ctx, "/admin/notes/"+strconv.Itoa(id)+"/edit?error=save")
+		return
+	}
+	a.redirect(ctx, "/admin/notes?saved=1")
 }
 
 func (a *Admin) noteCreate(ctx arry.Context) {

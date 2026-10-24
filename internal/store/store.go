@@ -135,8 +135,10 @@ type UserStore interface {
 // NoteStore manages short posts shown in the 微语 timeline.
 type NoteStore interface {
 	ListNotes(f NoteFilter) ([]*model.Note, int, error)
+	GetNote(id int64) (*model.Note, error)
 	GetNoteBySource(source, sourceID string) (*model.Note, error)
 	CreateNote(n *model.Note) error
+	UpdateNote(id int64, content, status string) error
 	DeleteNote(id int64) error
 	CountNotes(status string) (int, error)
 }

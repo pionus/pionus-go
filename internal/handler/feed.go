@@ -79,6 +79,49 @@ func Feed(db store.Store) arry.Handler {
 	}
 }
 
+func NotesFeed(db store.Store) arry.Handler {
+	return func(ctx arry.Context) {
+		base := siteBaseURL(ctx, db)
+		site := loadSite(db)
+
+		notes, _, err := db.ListNotes(store.NoteFilter{
+			Statuses: []string{model.StatusPublish},
+			Page:     1,
+			Limit:    30,
+		})
+		if err != nil {
+			slog.Error("notes feed", "err", err)
+			ctx.Reply(http.StatusInternalServerError)
+			return
+		}
+
+		doc := rssDocument{
+			Version: "2.0",
+			Channel: rssChannel{
+				Title:         site.Title + " - 微语",
+				Link:          base + "/notes",
+				Description:   site.Description,
+				Language:      site.Locale,
+				LastBuildDate: time.Now().Format(time.RFC1123Z),
+				Generator:     "Pionus",
+			},
+		}
+		for _, n := range notes {
+			link := base + "/notes/" + strconv.FormatInt(n.ID, 10)
+			doc.Channel.Items = append(doc.Channel.Items, rssItem{
+				Title:       "微语",
+				Link:        link,
+				GUID:        link,
+				PubDate:     n.CreatedAt.Format(time.RFC1123Z),
+				Description: n.Content,
+			})
+		}
+
+		ctx.SetHeader("Cache-Control", "public, max-age=300")
+		writeXML(ctx, doc, "application/rss+xml; charset=utf-8")
+	}
+}
+
 func CommentsFeed(db store.Store) arry.Handler {
 	return func(ctx arry.Context) {
 		base := siteBaseURL(ctx, db)

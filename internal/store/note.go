@@ -65,6 +65,21 @@ func (s *SQLiteStore) ListNotes(f NoteFilter) ([]*model.Note, int, error) {
 	return notes, total, rows.Err()
 }
 
+func (s *SQLiteStore) GetNote(id int64) (*model.Note, error) {
+	n := &model.Note{}
+	err := s.db.QueryRow(
+		`SELECT id, content, status, source, source_id, created_at, updated_at
+		 FROM notes WHERE id = ?`, id,
+	).Scan(&n.ID, &n.Content, &n.Status, &n.Source, &n.SourceID, &n.CreatedAt, &n.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get note: %w", err)
+	}
+	return n, nil
+}
+
 func (s *SQLiteStore) GetNoteBySource(source, sourceID string) (*model.Note, error) {
 	n := &model.Note{}
 	err := s.db.QueryRow(
@@ -102,6 +117,24 @@ func (s *SQLiteStore) CreateNote(n *model.Note) error {
 		return fmt.Errorf("create note: %w", err)
 	}
 	n.ID, _ = res.LastInsertId()
+	return nil
+}
+
+func (s *SQLiteStore) UpdateNote(id int64, content, status string) error {
+	if status == "" {
+		status = model.StatusPublish
+	}
+	res, err := s.db.Exec(
+		`UPDATE notes SET content = ?, status = ?, updated_at = ? WHERE id = ?`,
+		content, status, time.Now(), id,
+	)
+	if err != nil {
+		return fmt.Errorf("update note %d: %w", id, err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
 	return nil
 }
 

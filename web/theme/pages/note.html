@@ -1,0 +1,18 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<article class="post">
+  <header class="post-head">
+    <p class="eyebrow">微语</p>
+    <h1>{{.Note.CreatedAt.Format "2006 年 01 月 02 日"}}</h1>
+  </header>
+  <div class="post-body">
+    <div class="timeline-content" style="max-width: var(--reading)">
+      <div class="note-body">{{.HTML}}</div>
+    </div>
+    <p style="margin-top: 24px"><a href="/notes">← 返回微语时间轴</a></p>
+  </div>
+</article>
+{{end}}
+
+{{define "scripts"}}{{end}}

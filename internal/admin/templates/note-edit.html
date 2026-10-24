@@ -1,0 +1,26 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<div class="page-head">
+  <h1>编辑微语</h1>
+  <a href="/admin/notes">返回列表</a>
+</div>
+
+{{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+
+<form class="panel" method="post" action="/admin/notes/{{.Note.ID}}">
+  <input type="hidden" name="_csrf" value="{{.CSRF}}">
+  <div class="field">
+    <label for="content">内容</label>
+    <textarea id="content" name="content" rows="8" maxlength="2000" required>{{.Note.Content}}</textarea>
+  </div>
+  <div class="field">
+    <label for="status">状态</label>
+    <select id="status" name="status">
+      <option value="publish" {{if eq .Note.Status "publish"}}selected{{end}}>公开</option>
+      <option value="hidden" {{if eq .Note.Status "hidden"}}selected{{end}}>隐藏</option>
+    </select>
+  </div>
+  <button class="btn primary" type="submit">保存</button>
+</form>
+{{end}}
