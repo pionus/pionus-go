@@ -1,5 +1,6 @@
 server:
   addr: ":8087"
+  access_log: "logs/access.log"
 
 timezone: "Asia/Shanghai"
 

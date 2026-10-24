@@ -121,8 +121,12 @@ func main() {
 	app := arry.New()
 	app.Use(middlewares.CORS())
 	app.Use(middlewares.Gzip)
-	os.MkdirAll("logs", 0755)
-	app.Use(middlewares.LoggerToFile("logs/access.log"))
+	if cfg.Server.AccessLog == "" || cfg.Server.AccessLog == "-" {
+		app.Use(middlewares.Logger())
+	} else {
+		os.MkdirAll("logs", 0755)
+		app.Use(middlewares.LoggerToFile(cfg.Server.AccessLog))
+	}
 	app.Use(middlewares.PanicWithHandler(func(ctx arry.Context, err interface{}) {
 		ctx.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "internal server error",

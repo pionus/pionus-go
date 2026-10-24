@@ -11,6 +11,8 @@ import (
 
 type ServerConfig struct {
 	Addr string `yaml:"addr"`
+	// AccessLog is the request log path. Empty or "-" logs to stdout.
+	AccessLog string `yaml:"access_log"`
 }
 
 type DatabaseConfig struct {
@@ -57,7 +59,7 @@ func Load(path string) (*Config, error) {
 	}
 
 	cfg := &Config{
-		Server:   ServerConfig{Addr: ":8087"},
+		Server:   ServerConfig{Addr: ":8087", AccessLog: "logs/access.log"},
 		Timezone: "Asia/Shanghai",
 		Database: DatabaseConfig{Path: "./data/pionus.db"},
 		Upload:   UploadConfig{Dir: "./uploads", MaxSizeMB: 10},
@@ -73,6 +75,9 @@ func Load(path string) (*Config, error) {
 	}
 	if v := os.Getenv("PIONUS_ADDR"); v != "" {
 		cfg.Server.Addr = v
+	}
+	if v, ok := os.LookupEnv("PIONUS_ACCESS_LOG"); ok {
+		cfg.Server.AccessLog = v
 	}
 	if v := os.Getenv("PIONUS_SECRET"); v != "" {
 		cfg.Security.Secret = v
