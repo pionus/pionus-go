@@ -73,7 +73,7 @@ func ListPosts(db store.Store) arry.Handler {
 	}
 }
 
-func GetPost(db store.Store) arry.Handler {
+func GetPost(db store.Store, guard *PostGuard) arry.Handler {
 	return func(ctx arry.Context) {
 		slug := ctx.Param("slug")
 
@@ -90,6 +90,10 @@ func GetPost(db store.Store) arry.Handler {
 
 		if !p.PubliclyVisible(time.Now()) && !ctx.IsAuthed() {
 			jsonError(ctx, http.StatusNotFound, "post not found")
+			return
+		}
+		if p.PostPassword != "" && !ctx.IsAuthed() && !guard.Allowed(ctx, p) {
+			jsonError(ctx, http.StatusForbidden, "post password required")
 			return
 		}
 

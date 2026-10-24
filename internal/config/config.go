@@ -33,9 +33,14 @@ type SessionConfig struct {
 	Secure     bool   `yaml:"secure"`
 }
 
+type SecurityConfig struct {
+	Secret string `yaml:"secret"`
+}
+
 type Config struct {
-	Server ServerConfig `yaml:"server"`
-	Theme  string       `yaml:"theme"`
+	Server   ServerConfig   `yaml:"server"`
+	Security SecurityConfig `yaml:"security"`
+	Theme    string         `yaml:"theme"`
 	// Timezone is the IANA zone used for timestamps and display.
 	Timezone  string         `yaml:"timezone"`
 	Database  DatabaseConfig `yaml:"database"`
@@ -68,6 +73,9 @@ func Load(path string) (*Config, error) {
 	}
 	if v := os.Getenv("PIONUS_ADDR"); v != "" {
 		cfg.Server.Addr = v
+	}
+	if v := os.Getenv("PIONUS_SECRET"); v != "" {
+		cfg.Security.Secret = v
 	}
 	if v := os.Getenv("PIONUS_TIMEZONE"); v != "" {
 		cfg.Timezone = v

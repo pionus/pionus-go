@@ -126,7 +126,7 @@ func csrfToken(ctx arry.Context) string {
 	return middlewares.CSRFToken(ctx)
 }
 
-func PostComment(db store.Store) arry.Handler {
+func PostComment(db store.Store, guard *PostGuard) arry.Handler {
 	return func(ctx arry.Context) {
 		slug := ctx.Param("slug")
 
@@ -144,6 +144,10 @@ func PostComment(db store.Store) arry.Handler {
 			notFound(ctx, db, "文章不存在")
 			return
 		}
+		if post.IsLocked() && !ctx.IsAuthed() && !guard.Allowed(ctx, post) {
+			ctx.Reply(http.StatusForbidden)
+			return
+		}
 		if !post.AllowComment || !commentsEnabled(db) {
 			ctx.Reply(http.StatusForbidden)
 			return
@@ -152,7 +156,7 @@ func PostComment(db store.Store) arry.Handler {
 		r := ctx.Request()
 		if err := r.ParseForm(); err != nil {
 			slog.Warn("comment parse form", "err", err)
-			renderArticle(ctx, db, slug, "表单内容无法解析。", nil)
+			renderArticle(ctx, db, guard, slug, "表单内容无法解析。", nil)
 			return
 		}
 
@@ -173,19 +177,19 @@ func PostComment(db store.Store) arry.Handler {
 
 		now := time.Now().Unix()
 		if form.Started == 0 || now-form.Started < 2 || now-form.Started > 2*60*60 {
-			renderArticle(ctx, db, slug, "提交过快或页面已过期，请重新提交。", form)
+			renderArticle(ctx, db, guard, slug, "提交过快或页面已过期，请重新提交。", form)
 			return
 		}
 		if form.Author == "" || utf8.RuneCountInString(form.Author) > 50 {
-			renderArticle(ctx, db, slug, "昵称不能为空且不能超过 50 个字符。", form)
+			renderArticle(ctx, db, guard, slug, "昵称不能为空且不能超过 50 个字符。", form)
 			return
 		}
 		if form.Content == "" || utf8.RuneCountInString(form.Content) > 5000 {
-			renderArticle(ctx, db, slug, "评论内容不能为空且不能超过 5000 个字符。", form)
+			renderArticle(ctx, db, guard, slug, "评论内容不能为空且不能超过 5000 个字符。", form)
 			return
 		}
 		if form.Email != "" && !validCommentEmail(form.Email) {
-			renderArticle(ctx, db, slug, "邮箱格式不正确。", form)
+			renderArticle(ctx, db, guard, slug, "邮箱格式不正确。", form)
 			return
 		}
 		if form.URL != "" && !strings.HasPrefix(form.URL, "http://") && !strings.HasPrefix(form.URL, "https://") {
@@ -207,7 +211,7 @@ func PostComment(db store.Store) arry.Handler {
 		}
 
 		if ip := ctx.ClientIP(); !commentLimits.Allow(ip) {
-			renderArticle(ctx, db, slug, "评论太频繁，请稍后再试。", form)
+			renderArticle(ctx, db, guard, slug, "评论太频繁，请稍后再试。", form)
 			return
 		} else {
 			commentLimits.Record(ip)
@@ -227,7 +231,7 @@ func PostComment(db store.Store) arry.Handler {
 		}
 		if err := db.CreateComment(comment); err != nil {
 			slog.Error("create comment", "post", post.ID, "err", err)
-			renderArticle(ctx, db, slug, "评论保存失败，请稍后再试。", form)
+			renderArticle(ctx, db, guard, slug, "评论保存失败，请稍后再试。", form)
 			return
 		}
 

@@ -3,6 +3,9 @@ server:
 
 timezone: "Asia/Shanghai"
 
+security:
+  secret: ""
+
 database:
   path: "./data/pionus.db"
 

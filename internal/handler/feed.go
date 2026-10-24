@@ -106,7 +106,7 @@ func CommentsFeed(db store.Store) arry.Handler {
 			},
 		}
 		for _, c := range comments {
-			if c.PostSlug == "" {
+			if c.PostSlug == "" || c.PostLocked {
 				continue
 			}
 			link := base + "/article/" + c.PostSlug + "#comment-" + strconv.FormatInt(c.ID, 10)

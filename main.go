@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -104,6 +106,18 @@ func main() {
 		cfg.Session.Secure,
 	)
 
+	secret := cfg.Security.Secret
+	if secret == "" {
+		buf := make([]byte, 32)
+		if _, err := rand.Read(buf); err != nil {
+			slog.Error("generate security secret", "err", err)
+			os.Exit(1)
+		}
+		secret = hex.EncodeToString(buf)
+		slog.Warn("security.secret is empty; using an ephemeral secret; password-post cookies will not survive a restart")
+	}
+	postGuard := handler.NewPostGuard(secret, cfg.Session.Secure)
+
 	app := arry.New()
 	app.Use(middlewares.CORS())
 	app.Use(middlewares.Gzip)
@@ -153,8 +167,9 @@ func main() {
 
 	router.Get("/", handler.Index(db))
 	router.Get("/article", handler.ArticleList(db))
-	router.Get("/article/:slug", withCommentForm(handler.ArticleDetail(db)))
-	router.Post("/article/:slug/comment", withCommentForm(handler.PostComment(db)))
+	router.Get("/article/:slug", withCommentForm(handler.ArticleDetail(db, postGuard)))
+	router.Post("/article/:slug/unlock", withCommentForm(handler.UnlockPost(db, postGuard)))
+	router.Post("/article/:slug/comment", withCommentForm(handler.PostComment(db, postGuard)))
 	router.Get("/category/:slug", handler.CategoryArchive(db))
 	router.Get("/tag/:slug", handler.TagArchive(db))
 	router.Get("/archives/:year", handler.DateArchive(db))
@@ -187,14 +202,14 @@ func main() {
 
 	api := arry.NewRouter(apiAuth)
 	api.Get("/posts", handler.ListPosts(db))
-	api.Get("/posts/:slug", handler.GetPost(db))
+	api.Get("/posts/:slug", handler.GetPost(db, postGuard))
 	api.Post("/posts", handler.CreatePost(db))
 	api.Put("/posts/:slug", handler.UpdatePost(db))
 	api.Delete("/posts/:slug", handler.DeletePost(db))
 
 	// Legacy article endpoints kept as aliases.
 	api.Get("/articles", handler.ListPosts(db))
-	api.Get("/articles/:slug", handler.GetPost(db))
+	api.Get("/articles/:slug", handler.GetPost(db, postGuard))
 	api.Post("/articles", handler.CreatePost(db))
 	api.Put("/articles/:slug", handler.UpdatePost(db))
 	api.Delete("/articles/:slug", handler.DeletePost(db))

@@ -27,9 +27,10 @@ func newTestHandlers(t *testing.T) (*arry.Arry, store.Store) {
 	app := arry.New()
 	app.Use(middlewares.Auth("secret", http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete))
 
+	guard := NewPostGuard("test-secret", false)
 	r := app.Router()
 	r.Get("/api/posts", ListPosts(db))
-	r.Get("/api/posts/:slug", GetPost(db))
+	r.Get("/api/posts/:slug", GetPost(db, guard))
 	r.Post("/api/posts", CreatePost(db))
 	r.Put("/api/posts/:slug", UpdatePost(db))
 	r.Delete("/api/posts/:slug", DeletePost(db))
@@ -58,6 +59,25 @@ func doRequest(t *testing.T, app *arry.Arry, method, path, token, body string) *
 	rec := httptest.NewRecorder()
 	app.ServeHTTP(rec, req)
 	return rec
+}
+
+func TestPasswordPostIsLockedInAPI(t *testing.T) {
+	app, db := newTestHandlers(t)
+
+	if err := db.CreatePost(&model.Post{
+		Slug: "locked", Title: "Locked", Content: "secret body",
+		Status: model.StatusPublish, PostPassword: "pw",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := doRequest(t, app, http.MethodGet, "/api/posts/locked", "", "")
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", rec.Code)
+	}
+	if strings.Contains(rec.Body.String(), "secret body") {
+		t.Fatal("locked content leaked")
+	}
 }
 
 func TestCreatePostRequiresAuth(t *testing.T) {

@@ -27,6 +27,10 @@ type Comment struct {
 	PostTitle string `json:"post_title,omitempty"`
 	PostSlug  string `json:"post_slug,omitempty"`
 
+	// PostLocked is set by listing queries when the parent post requires a
+	// password.
+	PostLocked bool `json:"-"`
+
 	// Source and SourceID identify imported comments.
 	Source   string `json:"-"`
 	SourceID string `json:"-"`

@@ -74,9 +74,9 @@ func ArticleList(db store.Store) arry.Handler {
 	}
 }
 
-func ArticleDetail(db store.Store) arry.Handler {
+func ArticleDetail(db store.Store, guard *PostGuard) arry.Handler {
 	return func(ctx arry.Context) {
-		renderArticle(ctx, db, ctx.Param("slug"), "", nil)
+		renderArticle(ctx, db, guard, ctx.Param("slug"), "", nil)
 	}
 }
 
@@ -280,7 +280,7 @@ func max(a, b int) int {
 }
 
 // renderArticle loads a post, its comments and renders the detail page.
-func renderArticle(ctx arry.Context, db store.Store, slug, errMsg string, form *commentForm) {
+func renderArticle(ctx arry.Context, db store.Store, guard *PostGuard, slug, errMsg string, form *commentForm) {
 	post, err := db.GetPost(slug)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -294,6 +294,10 @@ func renderArticle(ctx arry.Context, db store.Store, slug, errMsg string, form *
 
 	if !post.PubliclyVisible(time.Now()) && !ctx.IsAuthed() {
 		notFound(ctx, db, "文章不存在")
+		return
+	}
+	if post.IsLocked() && !ctx.IsAuthed() && !guard.Allowed(ctx, post) {
+		renderPassword(ctx, db, post, "", http.StatusOK)
 		return
 	}
 

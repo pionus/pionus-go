@@ -78,6 +78,11 @@ func (p *Post) DisplayTime() time.Time {
 	return p.CreatedAt
 }
 
+// IsLocked reports whether the post requires a password.
+func (p *Post) IsLocked() bool {
+	return p.PostPassword != ""
+}
+
 // IsPublished reports whether the post has publish status.
 func (p *Post) IsPublished() bool {
 	return p.Status == StatusPublish
