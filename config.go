@@ -52,7 +52,6 @@ func LoadConfig(path string) (*Config, error) {
 
 	cfg := &Config{
 		Server:   ServerConfig{Addr: ":8087"},
-		Theme:    "default",
 		Timezone: "Asia/Shanghai",
 		Database: DatabaseConfig{Path: "./data/pionus.db"},
 		Upload:   UploadConfig{Dir: "./uploads", MaxSizeMB: 10},

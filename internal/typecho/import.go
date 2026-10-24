@@ -50,6 +50,7 @@ type Report struct {
 	Updated            int      `json:"updated"`
 	SkippedDrafts      int      `json:"skipped_drafts"`
 	SkippedAttachments int      `json:"skipped_attachments"`
+	NeedsPasswordReset bool     `json:"needs_password_reset,omitempty"`
 	MissingUploads     []string `json:"missing_uploads,omitempty"`
 	Warnings           []string `json:"warnings,omitempty"`
 }
@@ -126,16 +127,17 @@ func Import(reader io.Reader, opts Options) (*Report, error) {
 		im.report.Warnings = append(im.report.Warnings,
 			"some Typecho attachments are missing on disk; copy usr/uploads before running with -typecho-uploads")
 	}
-	im.report.Warnings = append(im.report.Warnings,
-		"imported users have no password; reset with: pionus -create-admin <username> -admin-password <password>")
-	im.report.Warnings = append(im.report.Warnings,
-		"category and tag URLs are not redirected yet; they need the category/tag archive pages")
+	if im.report.NeedsPasswordReset {
+		im.report.Warnings = append(im.report.Warnings,
+			"imported users have no password; reset with: pionus -create-admin <username> -admin-password <password>")
+	}
 
 	return im.report, nil
 }
 
 func (im *importer) dryRun() (*Report, error) {
 	im.report.Users = len(im.ex.Users)
+	im.report.NeedsPasswordReset = len(im.ex.Users) > 0
 	for _, m := range im.ex.Metas {
 		switch m.Type {
 		case "category":
@@ -185,6 +187,9 @@ func (im *importer) importUsers() error {
 			}
 			im.userIDs[u.UID] = existing.ID
 			im.report.Users++
+			if existing.PasswordHash == "" {
+				im.report.NeedsPasswordReset = true
+			}
 			continue
 		}
 		if !errors.Is(err, store.ErrNotFound) {
@@ -213,6 +218,7 @@ func (im *importer) importUsers() error {
 		}
 		im.userIDs[u.UID] = user.ID
 		im.report.Users++
+		im.report.NeedsPasswordReset = true
 	}
 	return nil
 }
@@ -537,13 +543,166 @@ func (im *importer) importComment(c Comment) error {
 }
 
 func (im *importer) importRedirects() error {
-	// The old home page and archive index.
-	for _, oldPath := range []string{"/index.php", "/blog/", "/blog", "/index.php/blog/", "/index.php/blog"} {
-		if err := im.opts.Store.SetRedirect(oldPath, "/article", 301); err != nil {
+	add := func(from, to string) error {
+		if from == "" || from == to {
+			return nil
+		}
+		if err := im.opts.Store.SetRedirect(from, to, 301); err != nil {
 			return err
 		}
 		im.report.Redirects++
+		return nil
 	}
+
+	// Old home and archive index.
+	for _, oldPath := range []string{"/index.php", "/index.php/"} {
+		if err := add(oldPath, "/"); err != nil {
+			return err
+		}
+	}
+	for _, oldPath := range []string{"/blog/", "/blog", "/index.php/blog/", "/index.php/blog"} {
+		if err := add(oldPath, "/article"); err != nil {
+			return err
+		}
+	}
+	// Feeds.
+	for _, oldPath := range []string{
+		"/index.php/feed/", "/index.php/feed", "/feed/",
+		"/index.php/feed/atom/", "/index.php/feed/atom", "/feed/atom/", "/feed/atom",
+	} {
+		if err := add(oldPath, "/feed"); err != nil {
+			return err
+		}
+	}
+	for _, oldPath := range []string{
+		"/index.php/feed/comments/", "/index.php/feed/comments",
+		"/feed/comments/", "/feed/comments",
+	} {
+		if err := add(oldPath, "/feed/comments"); err != nil {
+			return err
+		}
+	}
+
+	pageSize := im.ex.Site.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	postCount := 0
+	for _, c := range im.ex.Contents {
+		if c.Type == "post" && c.Status == "publish" {
+			postCount++
+		}
+	}
+	for page := 2; page <= (postCount+pageSize-1)/pageSize && page <= 100; page++ {
+		n := strconv.Itoa(page)
+		for _, oldPath := range []string{"/page/" + n + "/", "/index.php/page/" + n + "/", "/blog/page/" + n + "/", "/index.php/blog/page/" + n + "/"} {
+			if err := add(oldPath, "/article?page="+n); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Categories and tags, including Typecho's /slug/{page}/ pagination.
+	for _, m := range im.ex.Metas {
+		slug := strings.TrimSpace(m.Slug)
+		if slug == "" {
+			continue
+		}
+		var base string
+		switch m.Type {
+		case "category":
+			base = "/category/" + slug
+		case "tag":
+			base = "/tag/" + slug
+		default:
+			continue
+		}
+
+		for _, oldPath := range []string{
+			"/index.php" + base + "/",
+			"/index.php" + base,
+			base + "/",
+		} {
+			if err := add(oldPath, base); err != nil {
+				return err
+			}
+		}
+
+		maxPage := (m.Count + pageSize - 1) / pageSize
+		if maxPage > 100 {
+			maxPage = 100
+		}
+		for page := 2; page <= maxPage; page++ {
+			n := strconv.Itoa(page)
+			for _, oldPath := range []string{
+				"/index.php" + base + "/" + n + "/",
+				base + "/" + n + "/",
+			} {
+				if err := add(oldPath, base+"?page="+n); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	// Date archives. Typecho's routes are /Y/, /Y/M/ and /Y/M/D/.
+	years := make(map[int]bool)
+	months := make(map[string]bool)
+	days := make(map[string]bool)
+	for _, c := range im.ex.Contents {
+		if c.Created == 0 || (c.Type != "post" && c.Type != "page") {
+			continue
+		}
+		t := im.wallTime(c.Created)
+		years[t.Year()] = true
+		months[t.Format("2006/01")] = true
+		days[t.Format("2006/01/02")] = true
+	}
+
+	for year := range years {
+		y := strconv.Itoa(year)
+		for _, oldPath := range []string{"/" + y + "/", "/index.php/" + y + "/"} {
+			if err := add(oldPath, "/archives/"+y); err != nil {
+				return err
+			}
+		}
+		maxPage := postCount/pageSize + 1
+		if maxPage > 100 {
+			maxPage = 100
+		}
+		for page := 2; page <= maxPage; page++ {
+			n := strconv.Itoa(page)
+			for _, oldPath := range []string{"/" + y + "/page/" + n + "/", "/index.php/" + y + "/page/" + n + "/"} {
+				if err := add(oldPath, "/archives/"+y+"?page="+n); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	for month := range months {
+		for _, oldPath := range []string{"/" + month + "/", "/index.php/" + month + "/"} {
+			if err := add(oldPath, "/archives/"+month); err != nil {
+				return err
+			}
+		}
+	}
+
+	for day := range days {
+		for _, oldPath := range []string{"/" + day + "/", "/index.php/" + day + "/"} {
+			if err := add(oldPath, "/archives/"+day); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Author archive.
+	for _, oldPath := range []string{"/author/1/", "/index.php/author/1/"} {
+		if err := add(oldPath, "/article"); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -558,6 +717,9 @@ func (im *importer) applySiteOptions() error {
 	}
 	if site.URL != "" {
 		values["site.url"] = site.URL
+	}
+	if site.Keywords != "" {
+		values["site.keywords"] = site.Keywords
 	}
 	if site.PageSize > 0 {
 		values["posts.per_page"] = strconv.Itoa(site.PageSize)

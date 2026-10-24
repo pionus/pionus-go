@@ -9,11 +9,14 @@ content and URLs.
 
 - Posts and independent pages, drafts, private and scheduled publishing
 - Categories, tags, threaded comments with moderation
-- Server-rendered public pages (Go templates) and a JSON API
+- Paper & Ink public theme (embedded): archive, category/tag/date pages,
+  search, TOC, code copy, KaTeX math, dark mode, broken-image placeholders
+- Native threaded comments with moderation, CSRF, honeypot and HTML sanitizing
+- RSS feed, comments feed, sitemap and robots.txt
 - Admin UI at `/admin`: dashboard, Markdown editor with preview, media
   library, taxonomies, comments and settings
 - bcrypt login, server-side sessions, CSRF protection, upload MIME validation
-- SQLite with WAL, embedded migrations, single-binary deployment
+- SQLite with WAL, embedded migrations and theme, single-binary deployment
 
 ## Quick start
 
@@ -47,7 +50,12 @@ pionus -config config.yaml -import-typecho typecho.json -typecho-uploads ./uploa
 PIONUS_ADMIN_PASSWORD='new-password' pionus -config config.yaml -create-admin Secbone
 ```
 
-See `tools/README.md` for what is converted and the remaining gaps.
+See `tools/README.md` for what is converted and the remaining gaps. To audit
+old images:
+
+```bash
+pionus -config config.yaml -audit-images
+```
 
 ## Configuration
 

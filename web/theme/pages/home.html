@@ -1,0 +1,58 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<section class="intro">
+  <p class="eyebrow">Notes &amp; Security</p>
+  <h1>{{.Site.Title}}</h1>
+  {{if .Site.Description}}<p class="lede">{{.Site.Description}}</p>{{end}}
+  <p class="intro-links">
+    <a href="/article">全部文章</a>
+    <span>·</span>
+    <a href="/feed">订阅 RSS</a>
+  </p>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2>最近文章</h2>
+    <a class="more" href="/article">全部 →</a>
+  </div>
+  {{if .Posts}}
+  <div class="post-list">
+    {{range .Posts}}
+    <a class="post-row" href="/article/{{.Slug}}">
+      <time datetime="{{.DisplayTime.Format "2006-01-02"}}">{{date .DisplayTime}}</time>
+      <div class="post-row-main">
+        <h3>{{.Title}}</h3>
+        {{if .Excerpt}}<p>{{.Excerpt}}</p>{{end}}
+        {{if .Categories}}<div class="mini-cats">{{range .Categories}}<span>{{.Name}}</span>{{end}}</div>{{end}}
+      </div>
+    </a>
+    {{end}}
+  </div>
+  {{else}}
+  <p class="empty">还没有文章。</p>
+  {{end}}
+</section>
+
+<div class="home-columns">
+  <section class="section">
+    <div class="section-head"><h2>分类</h2><a class="more" href="/categories">全部 →</a></div>
+    <ul class="chips">
+      {{range .Categories}}
+      <li><a href="/category/{{.Slug}}">{{.Name}} <small>{{.PostCount}}</small></a></li>
+      {{end}}
+    </ul>
+  </section>
+  <section class="section">
+    <div class="section-head"><h2>标签</h2><a class="more" href="/tags">全部 →</a></div>
+    <ul class="chips tags">
+      {{range .Tags}}
+      <li><a href="/tag/{{.Slug}}">{{.Name}}</a></li>
+      {{end}}
+    </ul>
+  </section>
+</div>
+{{end}}
+
+{{define "scripts"}}{{end}}

@@ -65,7 +65,8 @@ pionus-go/
 │   │   └── option.go             # Options + redirects
 │   ├── content/
 │   │   ├── post.go               # Shared post input validation
-│   │   └── markdown.go           # Shared goldmark renderer
+│   │   ├── markdown.go           # Shared goldmark renderer
+│   │   └── render.go             # TOC, legacy HTML normalization, math flag
 │   ├── auth/
 │   │   └── auth.go               # bcrypt, sessions, RequireUser
 │   ├── admin/
@@ -77,9 +78,14 @@ pionus-go/
 │   │   ├── media.go              # Uploads and media library
 │   │   ├── settings.go           # Site settings
 │   │   └── templates/            # Server-rendered admin UI (go:embed)
+│   ├── imageaudit/
+│   │   └── audit.go              # Image reference audit (local + online)
 │   ├── handler/
 │   │   ├── post.go               # JSON API
-│   │   ├── page.go               # SSR pages
+│   │   ├── page.go               # Home, archives, post detail
+│   │   ├── comments.go           # Comment tree, submission, sanitizing
+│   │   ├── feed.go               # RSS, comments feed, sitemap, robots
+│   │   ├── site.go               # Shared public page data
 │   │   └── redirect.go           # Legacy URL catch-all
 │   ├── migrate/
 │   │   └── markdown.go           # Legacy markdown import
@@ -88,9 +94,14 @@ pionus-go/
 │       └── import.go
 ├── tools/
 │   └── typecho-export.php        # Read-only Typecho exporter
+├── web/
+│   ├── embed.go                  # go:embed theme + template funcs
+│   └── theme/
+│       ├── pages/                # Paper & Ink public templates
+│       └── assets/               # CSS, JS, KaTeX
 ├── markdowns/                    # Legacy markdown files
 ├── uploads/                      # Uploaded media (runtime)
-├── theme/                        # Frontend theme (git submodule)
+├── theme/                        # Old Typecho theme submodule (unused)
 ├── Dockerfile
 └── Makefile
 ```
@@ -102,7 +113,6 @@ pionus-go/
 ```yaml
 server:
   addr: ":8087"
-theme: default
 timezone: "Asia/Shanghai"
 database:
   path: "./data/pionus.db"
@@ -182,20 +192,29 @@ Bootstrap without the browser:
 ./pionus -create-admin admin -admin-password 'change-me-please'
 ```
 
-### SSR Pages
+### Public Pages
+
+The Paper & Ink theme is embedded in the binary and served from `web/theme`.
+Old Typecho URLs are handled by the redirect table.
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/` | Cover page with the latest 5 posts |
+| GET | `/` | Home: intro, latest posts, categories and tags |
 | GET | `/article?page=N` | Archive grouped by year |
-| GET | `/article/:slug` | Post detail (drafts visible to auth only) |
+| GET | `/article/:slug` | Post/page detail with TOC, comments, math |
+| POST | `/article/:slug/comment` | Native comment submission (CSRF, honeypot, time trap) |
+| GET | `/category/:slug` | Category archive |
+| GET | `/tag/:slug` | Tag archive |
+| GET | `/archives/:year[/:month[/:day]]` | Date archives |
+| GET | `/search?q=` | Search (legacy `/search/:q` redirects) |
+| GET | `/categories`, `/tags` | Taxonomy indexes |
+| GET | `/feed`, `/feed/comments` | RSS 2.0 feeds |
+| GET | `/sitemap.xml`, `/robots.txt` | SEO endpoints |
 | GET | `/health` | Health check |
 
 ### Static
 
-- `/assets` → `./theme/{theme}/assets`
-- `/node_modules` → `./theme/{theme}/node_modules`
-- `/web_modules` → `./theme/{theme}/web_modules`
+- `/assets` → embedded `web/theme/assets` (CSS, JS, KaTeX)
 - `/uploads` → `upload.dir`
 
 ## Data Model
@@ -240,6 +259,7 @@ make start        # build + start in background
 make stop
 make restart
 make migrate      # import markdowns/ into SQLite (idempotent)
+go run . -audit-images            # report missing local images / external hosts
 make test
 make vet
 make fmt
@@ -294,30 +314,30 @@ available, and writes legacy URL redirects. Details and current gaps are in
    implement in the matching file; always update tests.
 4. **Schema change**: add `003_*.sql`; never edit an applied migration. The
    runner records versions in `schema_migrations`.
-5. **Markdown**: render through `content.RenderMarkdown` so public pages,
-   preview and future feeds stay consistent.
-6. **Theme data keys**: `Articles`, `Groups`, `Article`, `RenderedContent`,
-   `ReadingTime`, `Prev`, `Next`, `CurrentPath` are consumed by the submodule.
-7. **Money path**: public listings must never expose drafts, hidden posts, or
-   scheduled posts; admin POSTs must always be CSRF-checked.
+5. **Rendering**: use `content.RenderPost` for public post bodies. It handles
+   Markdown/HTML, heading IDs, TOC, legacy HTML cleanup and math detection.
+6. **Theme**: templates live in `web/theme/pages` and are embedded; data keys
+   are built in `internal/handler` (`Posts`, `Groups`, `Post`, `Rendered`,
+   `TOC`, `Comments`, `Form`, `CSRF`, ...).
+7. **Money path**: public listings must never expose drafts or scheduled posts;
+   admin POSTs and comment submissions must be CSRF-checked.
 8. **Uploads**: validate by sniffed MIME, never by the client filename; keep
    the generated path relative and store it in `media.path`.
 
 ## Current Status / Next Steps
 
-Done: schema, store layer, post API, SSR pages, markdown import, WAL, build,
-bcrypt login, sessions/CSRF, first-run setup, admin UI (dashboard, editor,
-media, taxonomies, comments, settings).
+Done: schema, store layer, JSON API, Paper & Ink public theme (home, archives,
+post, TOC, code copy, KaTeX, responsive dark mode), native comments with
+moderation and sanitizing, search, RSS/comments feeds, sitemap, image fallback,
+embedded assets, and the Typecho importer with idempotent content, taxonomy,
+comment, attachment and legacy URL handling.
 
-Typecho migration is implemented: JSON export, idempotent import, HTML/Markdown
-preservation, taxonomies, comments, views, attachments and legacy post/page
-redirects.
+Pending for full Typecho parity:
 
-Pending for Typecho parity:
-
-1. Public comment submission and rendering, moderation notifications and spam
-   protection.
-2. Category, tag and date archive pages, plus their 301 redirects.
-3. Feeds (`/feed/`), sitemap, search, Typecho-compatible permalinks.
-4. Theme rewrite in Go templates to match the old Typecho look.
-5. Password-protected post gating and draft preview links.
+1. Password-protected post gating.
+2. Draft preview links for anonymous reviewers.
+3. Comment email notifications and optional rate limiting.
+4. Recovering the three missing Typecho attachments (files are absent on the
+   old server).
+5. Deployment: point DNS at the new host, migrate `data/` + `uploads/`, enable
+   HTTPS/secure cookies.

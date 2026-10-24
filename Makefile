@@ -1,4 +1,4 @@
-.PHONY: dev build start stop restart migrate test vet fmt tidy docker
+.PHONY: dev build start stop restart migrate test vet fmt tidy docker audit audit-online
 
 OUTFILE=pionus
 PIDFILE=pionus.pid
@@ -37,3 +37,9 @@ tidy:
 
 docker:
 	docker build -t pionus .
+
+audit:
+	go run . -audit-images
+
+audit-online:
+	go run . -audit-images -audit-images-online

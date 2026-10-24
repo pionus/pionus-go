@@ -1,0 +1,19 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<header class="page-head">
+  <p class="eyebrow">Tags</p>
+  <h1>标签</h1>
+  <p class="muted">共 {{len .Tags}} 个标签</p>
+</header>
+
+<ul class="tag-cloud">
+  {{range .Tags}}
+  <li><a href="/tag/{{.Slug}}">{{.Name}} <small>{{.PostCount}}</small></a></li>
+  {{else}}
+  <li class="muted">还没有标签。</li>
+  {{end}}
+</ul>
+{{end}}
+
+{{define "scripts"}}{{end}}

@@ -13,5 +13,4 @@ pionus.pid
 .env
 go.work
 go.work.sum
-theme/default/node_modules/
-theme/default/web_modules/
+theme/

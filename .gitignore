@@ -13,3 +13,5 @@ go.work
 go.work.sum
 uploads/
 certs/
+
+.playwright-mcp/

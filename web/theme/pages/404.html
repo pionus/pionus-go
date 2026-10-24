@@ -1,0 +1,16 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<section class="error-page">
+  <p class="eyebrow">404</p>
+  <h1>页面没找到</h1>
+  <p class="lede">{{if .Message}}{{.Message}}{{else}}你想查看的内容可能已被移动或删除。{{end}}</p>
+  <form class="big-search" method="get" action="/search">
+    <input type="search" name="q" placeholder="搜索文章…" aria-label="搜索文章">
+    <button type="submit">搜索</button>
+  </form>
+  <p><a href="/article">← 返回文章归档</a></p>
+</section>
+{{end}}
+
+{{define "scripts"}}{{end}}

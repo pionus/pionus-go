@@ -1,0 +1,23 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<header class="page-head">
+  <p class="eyebrow">Categories</p>
+  <h1>分类</h1>
+  <p class="muted">按主题浏览文章</p>
+</header>
+
+<div class="taxonomy-grid">
+  {{range .Categories}}
+  <a class="tax-card" href="/category/{{.Slug}}">
+    <h2>{{.Name}}</h2>
+    {{if .Description}}<p>{{.Description}}</p>{{end}}
+    <span>{{.PostCount}} 篇文章</span>
+  </a>
+  {{else}}
+  <p class="empty">还没有分类。</p>
+  {{end}}
+</div>
+{{end}}
+
+{{define "scripts"}}{{end}}

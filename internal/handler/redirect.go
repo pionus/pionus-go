@@ -10,7 +10,7 @@ import (
 
 // Redirects answers unmatched GET requests by looking up legacy Typecho URLs.
 // Register it as the last catch-all route.
-func Redirects(db store.RedirectStore) arry.Handler {
+func Redirects(db store.Store) arry.Handler {
 	return func(ctx arry.Context) {
 		requestPath := ctx.Request().URL.Path
 
@@ -42,8 +42,13 @@ func Redirects(db store.RedirectStore) arry.Handler {
 			return
 		}
 
-		ctx.Reply(http.StatusNotFound)
+		notFound(ctx, db, "页面不存在或已被移动。")
 	}
+}
+
+// LegacyHome redirects Typecho's /index.php entry point to the site root.
+func LegacyHome(ctx arry.Context) {
+	ctx.Redirect(http.StatusMovedPermanently, "/")
 }
 
 func redirectCandidates(requestPath string) []string {

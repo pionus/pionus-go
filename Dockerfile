@@ -19,7 +19,6 @@ ENV TZ=Asia/Shanghai
 WORKDIR /app
 COPY --from=builder /out/pionus ./pionus
 COPY --from=builder /src/config.yaml ./config.yaml
-COPY --from=builder /src/theme ./theme
 COPY --from=builder /src/markdowns ./markdowns
 
 USER pionus

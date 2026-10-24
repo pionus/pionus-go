@@ -38,6 +38,9 @@ type PostFilter struct {
 	Query string
 	// PublishedBefore hides posts scheduled after the given time.
 	PublishedBefore *time.Time
+	// PublishedFrom/PublishedTo select a publication-time range.
+	PublishedFrom *time.Time
+	PublishedTo   *time.Time
 	// Page is 1-based. Limit defaults to 20.
 	Page  int
 	Limit int

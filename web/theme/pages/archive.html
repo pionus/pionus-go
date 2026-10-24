@@ -1,0 +1,54 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<header class="page-head">
+  <p class="eyebrow">{{if eq .ArchiveKind "search"}}Search{{else if eq .ArchiveKind "category"}}Category{{else if eq .ArchiveKind "tag"}}Tag{{else if eq .ArchiveKind "date"}}Archive{{else}}Archive{{end}}</p>
+  <h1>{{.ArchiveTitle}}</h1>
+  <p class="muted">{{.Total}} 篇{{if .SearchQuery}}，关键词 “{{.SearchQuery}}”{{end}}</p>
+</header>
+
+{{if .Groups}}
+  {{range .Groups}}
+  <section class="year-group">
+    <h2 class="year">{{.Year}}</h2>
+    <div class="archive-list">
+      {{range .Posts}}
+      <a class="archive-row" href="/article/{{.Slug}}">
+        <time datetime="{{.DisplayTime.Format "2006-01-02"}}">{{.DisplayTime.Format "01-02"}}</time>
+        <span class="archive-title">{{.Title}}</span>
+        {{if .Categories}}<span class="archive-cat">{{range $i, $c := .Categories}}{{if $i}} / {{end}}{{$c.Name}}{{end}}</span>{{end}}
+      </a>
+      {{end}}
+    </div>
+  </section>
+  {{end}}
+{{else if .Posts}}
+  <div class="post-list">
+    {{range .Posts}}
+    <a class="post-row" href="/article/{{.Slug}}">
+      <time datetime="{{.DisplayTime.Format "2006-01-02"}}">{{date .DisplayTime}}</time>
+      <div class="post-row-main">
+        <h3>{{.Title}}</h3>
+        {{if .Excerpt}}<p>{{.Excerpt}}</p>{{end}}
+        {{if .Categories}}<div class="mini-cats">{{range .Categories}}<span>{{.Name}}</span>{{end}}</div>{{end}}
+      </div>
+    </a>
+    {{end}}
+  </div>
+{{else}}
+  <div class="empty-state">
+    <p>没有找到内容。</p>
+    {{if .SearchQuery}}<p class="muted">试试更短的关键词，或从 <a href="/article">归档</a> 浏览。</p>{{end}}
+  </div>
+{{end}}
+
+{{if gt .TotalPages 1}}
+<nav class="pager" aria-label="分页">
+  {{if .HasPrev}}<a href="{{.PrevURL}}" rel="prev">← 上一页</a>{{else}}<span></span>{{end}}
+  <span class="pager-info">{{.Page}} / {{.TotalPages}}</span>
+  {{if .HasNext}}<a href="{{.NextURL}}" rel="next">下一页 →</a>{{else}}<span></span>{{end}}
+</nav>
+{{end}}
+{{end}}
+
+{{define "scripts"}}{{end}}

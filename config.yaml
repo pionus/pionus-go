@@ -1,7 +1,6 @@
 server:
   addr: ":8087"
 
-theme: default
 timezone: "Asia/Shanghai"
 
 database:

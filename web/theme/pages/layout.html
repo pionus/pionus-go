@@ -1,0 +1,72 @@
+{{define "layout"}}
+<!DOCTYPE html>
+<html lang="{{.Site.Locale}}" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{if eq .Title .Site.Title}}{{.Site.Title}}{{else}}{{.Title}} · {{.Site.Title}}{{end}}</title>
+<meta name="description" content="{{if .Post}}{{.Post.Excerpt}}{{else}}{{.Site.Description}}{{end}}">
+<meta name="author" content="{{.Site.Author}}">
+{{if .Site.Keywords}}<meta name="keywords" content="{{.Site.Keywords}}">{{end}}
+<link rel="canonical" href="{{.CanonicalURL}}">
+<link rel="alternate" type="application/rss+xml" title="{{.Site.Title}}" href="/feed">
+<meta property="og:site_name" content="{{.Site.Title}}">
+<meta property="og:title" content="{{if .Post}}{{.Post.Title}}{{else}}{{.Title}}{{end}}">
+<meta property="og:description" content="{{if .Post}}{{.Post.Excerpt}}{{else}}{{.Site.Description}}{{end}}">
+<meta property="og:url" content="{{.CanonicalURL}}">
+{{if .Post}}<meta property="og:type" content="article">
+<meta property="article:published_time" content="{{.Post.DisplayTime.Format "2006-01-02T15:04:05Z07:00"}}">
+{{if .Post.Categories}}{{range .Post.Categories}}<meta property="article:section" content="{{.Name}}">
+{{end}}{{end}}{{else}}<meta property="og:type" content="website">{{end}}
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✒️</text></svg>">
+<link rel="stylesheet" href="/assets/main.css">
+<script>
+(function () {
+  var saved = null;
+  try { saved = localStorage.getItem('pionus-theme'); } catch (e) {}
+  var theme = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  document.documentElement.dataset.theme = theme;
+})();
+</script>
+</head>
+<body>
+<a class="skip" href="#main">跳到正文</a>
+<div class="progress" id="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="/">{{.Site.Title}}</a>
+    <nav class="nav" aria-label="主导航">
+      <a href="/article" {{if contains .CurrentPath "/article"}}class="active"{{end}}>文章</a>
+      <a href="/categories" {{if eq .CurrentPath "/categories"}}class="active"{{end}}>分类</a>
+      <a href="/tags" {{if eq .CurrentPath "/tags"}}class="active"{{end}}>标签</a>
+      {{range .NavPages}}<a href="/article/{{.Slug}}" {{if eq $.CurrentPath (printf "/article/%s" .Slug)}}class="active"{{end}}>{{.Title}}</a>{{end}}
+      <a href="/feed" title="RSS 订阅">RSS</a>
+    </nav>
+    <div class="header-actions">
+      <form class="search" method="get" action="/search" role="search">
+        <input type="search" name="q" value="{{.SearchQuery}}" placeholder="搜索文章…" aria-label="搜索文章">
+        <button type="submit" aria-label="搜索">↵</button>
+      </form>
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换深色模式">◐</button>
+    </div>
+  </div>
+</header>
+<main id="main" class="wrap">
+{{template "content" .}}
+</main>
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <span>© {{.Year}} {{.Site.Author}}</span>
+    <span class="footer-links">
+      <a href="/feed">RSS</a>
+      <a href="/sitemap.xml">Sitemap</a>
+      <a href="/admin">后台</a>
+    </span>
+    <span class="powered">Powered by Pionus</span>
+  </div>
+</footer>
+<script src="/assets/app.js" defer></script>
+{{template "scripts" .}}
+</body>
+</html>
+{{end}}

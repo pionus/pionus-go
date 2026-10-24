@@ -13,6 +13,7 @@ var settingKeys = []string{
 	"site.description",
 	"site.author",
 	"site.url",
+	"site.keywords",
 	"site.locale",
 	"posts.per_page",
 	"comments.enabled",
@@ -40,6 +41,7 @@ func (a *Admin) settingsSave(ctx arry.Context) {
 		"site.description": strings.TrimSpace(form.PostFormValue("site.description")),
 		"site.author":      strings.TrimSpace(form.PostFormValue("site.author")),
 		"site.url":         strings.TrimRight(strings.TrimSpace(form.PostFormValue("site.url")), "/"),
+		"site.keywords":    strings.TrimSpace(form.PostFormValue("site.keywords")),
 		"site.locale":      strings.TrimSpace(form.PostFormValue("site.locale")),
 	}
 

@@ -1,0 +1,137 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<article class="post">
+  <header class="post-head">
+    {{if .Post.Categories}}
+    <div class="cats">
+      {{range .Post.Categories}}<a href="/category/{{.Slug}}">{{.Name}}</a>{{end}}
+    </div>
+    {{end}}
+    <h1>{{.Post.Title}}</h1>
+    <p class="post-meta">
+      {{if .Post.Author}}<span>{{.Post.Author}}</span>{{end}}
+      <time datetime="{{.Post.DisplayTime.Format "2006-01-02T15:04:05Z07:00"}}">{{date .Post.DisplayTime}}</time>
+      <span>{{.ReadingTime}} 分钟阅读</span>
+      <span>{{.Post.Views}} 次阅读</span>
+    </p>
+  </header>
+
+  <div class="post-layout{{if not .TOC}} no-toc{{end}}">
+    <div class="post-body">
+      <div class="prose">
+        {{.Rendered.HTML}}
+      </div>
+
+      {{if .Post.Tags}}
+      <div class="post-tags">
+        {{range .Post.Tags}}<a href="/tag/{{.Slug}}">#{{.Name}}</a>{{end}}
+      </div>
+      {{end}}
+
+      {{if not .IsPage}}
+      <nav class="post-nav" aria-label="相邻文章">
+        {{with .Prev}}
+        <a class="prev" href="/article/{{.Slug}}"><small>← 上一篇</small><span>{{.Title}}</span></a>
+        {{else}}<span></span>{{end}}
+        {{with .Next}}
+        <a class="next" href="/article/{{.Slug}}"><small>下一篇 →</small><span>{{.Title}}</span></a>
+        {{else}}<span></span>{{end}}
+      </nav>
+      {{end}}
+    </div>
+
+    {{if .TOC}}
+    <aside class="toc" aria-label="目录">
+      <details open>
+        <summary>本文目录</summary>
+        <nav>
+          {{range .TOC}}<a class="toc-level-{{.Level}}" href="#{{.ID}}">{{.Text}}</a>{{end}}
+        </nav>
+      </details>
+    </aside>
+    {{end}}
+  </div>
+
+  {{template "comments" .}}
+</article>
+{{end}}
+
+{{define "comments"}}
+<section id="comments" class="comments">
+  <div class="comments-head">
+    <h2>{{if .CommentCount}}{{.CommentCount}} 条评论{{else}}评论{{end}}</h2>
+    {{if .CanComment}}<a href="#comment-form" class="more">写评论 →</a>{{end}}
+  </div>
+
+  {{if .CommentMessage}}<p class="notice">{{.CommentMessage}}</p>{{end}}
+
+  {{if .Comments}}
+  <div class="comment-list">
+    {{range .Comments}}{{template "comment" .}}{{end}}
+  </div>
+  {{else}}
+  <p class="muted">还没有评论。</p>
+  {{end}}
+
+  {{if .CanComment}}
+  <form method="post" action="{{.CommentAction}}" class="comment-form" id="comment-form">
+    <input type="hidden" name="_csrf" value="{{.CSRF}}">
+    <input type="hidden" name="started" value="{{.Form.Started}}">
+    <input type="hidden" name="parent_id" id="parent_id" value="{{.Form.Parent}}">
+    <div class="comment-form-head">
+      <h3>写下你的评论</h3>
+      <button type="button" id="cancel-reply" class="linkish" hidden>取消回复</button>
+    </div>
+    <p class="reply-hint" id="reply-hint" hidden></p>
+    {{if .CommentError}}<p class="error">{{.CommentError}}</p>{{end}}
+    <div class="form-row">
+      <label>昵称
+        <input type="text" name="author" value="{{.Form.Author}}" maxlength="50" required autocomplete="nickname">
+      </label>
+      <label>邮箱（可选）
+        <input type="email" name="email" value="{{.Form.Email}}" maxlength="120" autocomplete="email">
+      </label>
+      <label>网站（可选）
+        <input type="url" name="url" value="{{.Form.URL}}" maxlength="200" autocomplete="url">
+      </label>
+    </div>
+    <label>内容
+      <textarea name="content" rows="7" maxlength="5000" required>{{.Form.Content}}</textarea>
+    </label>
+    <div class="hp" aria-hidden="true">
+      <label>网站<input type="text" name="_hp" tabindex="-1" autocomplete="off"></label>
+    </div>
+    <div class="comment-form-foot">
+      <button type="submit">提交评论</button>
+      <span class="muted">评论会经过过滤；含链接的评论可能需要审核。</span>
+    </div>
+  </form>
+  {{else}}
+  <p class="muted">评论已关闭。</p>
+  {{end}}
+</section>
+{{end}}
+
+{{define "comment"}}
+<div class="comment depth-{{.Depth}}" id="comment-{{.ID}}">
+  <div class="avatar" style="--avatar:{{.Color}}" aria-hidden="true">{{.Initial}}</div>
+  <div class="comment-main">
+    <div class="comment-meta">
+      <strong>{{if .URL}}<a href="{{.URL}}" rel="nofollow noopener" target="_blank">{{.Author}}</a>{{else}}{{.Author}}{{end}}</strong>
+      <a class="comment-time" href="#comment-{{.ID}}"><time datetime="{{.CreatedAt.Format "2006-01-02T15:04:05Z07:00"}}">{{date .CreatedAt}}</time></a>
+    </div>
+    <div class="comment-body">{{.HTML}}</div>
+    <button class="linkish reply" type="button" data-reply="{{.ID}}" data-author="{{.Author}}">回复</button>
+    {{range .Children}}{{template "comment" .}}{{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "scripts"}}
+{{if .Rendered.HasMath}}
+<link rel="stylesheet" href="/assets/katex/katex.min.css">
+<script defer src="/assets/katex/katex.min.js"></script>
+<script defer src="/assets/katex/contrib/auto-render.min.js" onload="renderMathInElement(document.querySelector('.prose'), {delimiters: [{left: '$$', right: '$$', display: true}, {left: '\\(', right: '\\)', display: false}, {left: '\\[', right: '\\]', display: true}], ignoredTags: ['pre', 'code', 'script', 'style', 'textarea']});"></script>
+{{end}}
+{{end}}

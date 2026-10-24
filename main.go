@@ -14,10 +14,12 @@ import (
 	"github.com/pionus/pionus-go/internal/admin"
 	"github.com/pionus/pionus-go/internal/auth"
 	"github.com/pionus/pionus-go/internal/handler"
+	"github.com/pionus/pionus-go/internal/imageaudit"
 	"github.com/pionus/pionus-go/internal/migrate"
 	"github.com/pionus/pionus-go/internal/model"
 	"github.com/pionus/pionus-go/internal/store"
 	"github.com/pionus/pionus-go/internal/typecho"
+	"github.com/pionus/pionus-go/web"
 )
 
 func main() {
@@ -30,6 +32,8 @@ func main() {
 	typechoUploads := flag.String("typecho-uploads", "", "path to the old Typecho usr/uploads directory")
 	typechoDryRun := flag.Bool("typecho-dry-run", false, "report what -import-typecho would do without writing")
 	typechoDrafts := flag.Bool("typecho-drafts", false, "also import Typecho post_draft autosave rows")
+	auditImages := flag.Bool("audit-images", false, "report missing local images and external image hosts")
+	auditOnline := flag.Bool("audit-images-online", false, "also check external image URLs while auditing")
 	flag.Parse()
 
 	cfg, err := LoadConfig(*configPath)
@@ -79,6 +83,17 @@ func main() {
 		return
 	}
 
+	if *auditImages {
+		report, err := imageaudit.Audit(db, cfg.Upload.Dir, *auditOnline)
+		if err != nil {
+			slog.Error("audit images", "err", err)
+			os.Exit(1)
+		}
+		out, _ := json.MarshalIndent(report, "", "  ")
+		fmt.Println(string(out))
+		return
+	}
+
 	if err := os.MkdirAll(cfg.Upload.Dir, 0755); err != nil {
 		slog.Error("create upload dir", "err", err)
 		os.Exit(1)
@@ -105,12 +120,9 @@ func main() {
 	}))
 	app.Use(session.Middleware())
 
-	themePath := "./theme/" + cfg.Theme
-	app.Static("/assets", themePath+"/assets")
-	app.Static("/node_modules", themePath+"/node_modules")
-	app.Static("/web_modules", themePath+"/web_modules")
+	app.StaticFS("/assets", web.AssetsFS())
 	app.Static("/uploads", cfg.Upload.Dir)
-	app.Views(themePath + "/pages")
+	app.ViewsWithConfig(web.EngineConfig())
 
 	if cfg.AuthToken == "" {
 		slog.Warn("PIONUS_AUTH_TOKEN is empty: token-authenticated API writes are disabled")
@@ -126,10 +138,37 @@ func main() {
 		ctx.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
 
-	// SSR pages
+	// Public pages. The article page also sets the CSRF cookie used by the
+	// native comment form.
+	commentCSRF := middlewares.CSRFWithConfig(middlewares.CSRFConfig{
+		CookieName: "pionus_csrf",
+		Secure:     cfg.Session.Secure,
+		MaxAge:     12 * 60 * 60,
+	})
+	withCommentForm := func(next arry.Handler) arry.Handler {
+		return commentCSRF(middlewares.BodyLimit(64 << 10)(next))
+	}
+
 	router.Get("/", handler.Index(db))
 	router.Get("/article", handler.ArticleList(db))
-	router.Get("/article/:slug", handler.ArticleDetail(db))
+	router.Get("/article/:slug", withCommentForm(handler.ArticleDetail(db)))
+	router.Post("/article/:slug/comment", withCommentForm(handler.PostComment(db)))
+	router.Get("/category/:slug", handler.CategoryArchive(db))
+	router.Get("/tag/:slug", handler.TagArchive(db))
+	router.Get("/archives/:year", handler.DateArchive(db))
+	router.Get("/archives/:year/:month", handler.DateArchive(db))
+	router.Get("/archives/:year/:month/:day", handler.DateArchive(db))
+	router.Get("/index.php", handler.LegacyHome)
+	router.Get("/index.php/", handler.LegacyHome)
+	router.Get("/search", handler.Search(db))
+	router.Get("/search/:q", handler.LegacySearch(db))
+	router.Get("/index.php/search/:q", handler.LegacySearch(db))
+	router.Get("/categories", handler.CategoriesPage(db))
+	router.Get("/tags", handler.TagsPage(db))
+	router.Get("/feed", handler.Feed(db))
+	router.Get("/feed/comments", handler.CommentsFeed(db))
+	router.Get("/sitemap.xml", handler.Sitemap(db))
+	router.Get("/robots.txt", handler.Robots(db))
 
 	// JSON API. A session login also authorizes writes; otherwise a bearer
 	// token is required.

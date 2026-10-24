@@ -8,6 +8,7 @@ import (
 
 	"github.com/pionus/arry"
 	"github.com/pionus/pionus-go/internal/store"
+	"github.com/pionus/pionus-go/web"
 )
 
 func TestRedirectHandler(t *testing.T) {
@@ -28,6 +29,7 @@ func TestRedirectHandler(t *testing.T) {
 	}
 
 	app := arry.New()
+	app.ViewsWithConfig(web.EngineConfig())
 	app.Router().Get("/*", Redirects(db))
 
 	cases := []struct {
@@ -68,6 +70,7 @@ func TestRedirectPreservesQuery(t *testing.T) {
 	}
 
 	app := arry.New()
+	app.ViewsWithConfig(web.EngineConfig())
 	app.Router().Get("/*", Redirects(db))
 
 	req := httptest.NewRequest(http.MethodGet, "/old/?page=2", nil)

@@ -27,6 +27,10 @@
       <input id="site.url" type="url" name="site.url" value="{{index .Options "site.url"}}" placeholder="https://example.com">
     </div>
     <div>
+      <label for="site.keywords">关键词</label>
+      <input id="site.keywords" type="text" name="site.keywords" value="{{index .Options "site.keywords"}}" placeholder="用逗号分隔">
+    </div>
+    <div>
       <label for="site.locale">语言</label>
       <input id="site.locale" type="text" name="site.locale" value="{{index .Options "site.locale"}}" placeholder="zh-CN">
     </div>

@@ -61,16 +61,32 @@ PIONUS_ADMIN_PASSWORD='new-password' pionus -config config.yaml -create-admin Se
   `archives-<cid>` and pages get `page-<cid>`.
 - `/usr/uploads/` links are rewritten to `/uploads/` in post and comment text.
 - Old URLs are inserted into `redirects`:
-  - `/index.php/archives/<cid>/` and `/archives/<cid>/`
-  - `/index.php/<page-slug>.html` and `/<page-slug>.html`
-  - `/index.php`, `/blog/` → `/article`
+  - posts: `/index.php/archives/<cid>/` and `/archives/<cid>/`
+  - pages: `/index.php/<slug>.html` and `/<slug>.html`
+  - categories/tags, including pagination
+  - date archives (`/Y/`, `/Y/M/`, `/Y/M/D/`)
+  - feeds, `/blog/`, `/page/N/` and `/index.php`
 - Attachments are copied to `upload.dir` and recorded in `media` when the
   source file exists.
 
+## Image audit
+
+After importing, check image references:
+
+```bash
+pionus -config config.yaml -audit-images
+pionus -config config.yaml -audit-images -audit-images-online
+```
+
+The first reports local `/uploads/` files that are missing and a host
+histogram for external images. The second also checks external URLs (8
+concurrent workers). The theme renders a placeholder for broken images and
+keeps a link to the original.
+
 ## Known gaps
 
-- Category, tag, year/month and feed URLs are not redirected yet; those pages
-  still need to be implemented in the new front-end.
 - Typecho `post_draft` autosave revisions are skipped by default. Pass
   `-typecho-drafts` to import them as drafts.
 - Password-protected posts are stored but password gating is not implemented.
+- The old server's `usr/uploads` directory was empty; three attachment files
+  are missing unless another backup exists.

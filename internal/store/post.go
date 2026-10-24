@@ -218,6 +218,14 @@ func postWhere(f PostFilter) (string, []any) {
 		clauses = append(clauses, "p.published_at IS NOT NULL AND p.published_at <= ?")
 		args = append(args, *f.PublishedBefore)
 	}
+	if f.PublishedFrom != nil {
+		clauses = append(clauses, "p.published_at >= ?")
+		args = append(args, *f.PublishedFrom)
+	}
+	if f.PublishedTo != nil {
+		clauses = append(clauses, "p.published_at < ?")
+		args = append(args, *f.PublishedTo)
+	}
 
 	if len(clauses) == 0 {
 		return "", args
