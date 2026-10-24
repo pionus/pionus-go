@@ -46,7 +46,10 @@ var commentPolicy = func() *bluemonday.Policy {
 	return p
 }()
 
-var commentLimits = newRateLimiter(5, 10*time.Minute)
+var (
+	commentLimits       = newRateLimiter(5, 10*time.Minute)
+	commentGlobalLimits = newRateLimiter(60, 10*time.Minute)
+)
 
 var smileRe = regexp.MustCompile(`\{smile:(\d+)\}`)
 
@@ -210,12 +213,13 @@ func PostComment(db store.Store, guard *PostGuard) arry.Handler {
 			status = model.CommentPending
 		}
 
-		if ip := ctx.ClientIP(); !commentLimits.Allow(ip) {
+		ip := ctx.ClientIP()
+		if !commentLimits.Allow(ip) || !commentGlobalLimits.Allow("global") {
 			renderArticle(ctx, db, guard, slug, "评论太频繁，请稍后再试。", form)
 			return
-		} else {
-			commentLimits.Record(ip)
 		}
+		commentLimits.Record(ip)
+		commentGlobalLimits.Record("global")
 
 		comment := &model.Comment{
 			PostID:    post.ID,
