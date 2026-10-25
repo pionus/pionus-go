@@ -42,9 +42,16 @@ type SecurityConfig struct {
 	Secret string `yaml:"secret"`
 }
 
+// PluginsConfig selects compile-time plugins and provides their settings.
+type PluginsConfig struct {
+	Enabled []string                  `yaml:"enabled"`
+	Config  map[string]map[string]any `yaml:"config"`
+}
+
 type Config struct {
 	Server   ServerConfig   `yaml:"server"`
 	Security SecurityConfig `yaml:"security"`
+	Plugins  PluginsConfig  `yaml:"plugins"`
 	Theme    string         `yaml:"theme"`
 	// Timezone is the IANA zone used for timestamps and display.
 	Timezone  string         `yaml:"timezone"`
@@ -116,6 +123,14 @@ func Load(path string) (*Config, error) {
 	}
 	if v := os.Getenv("PIONUS_SESSION_SECURE"); v != "" {
 		cfg.Session.Secure = v == "1" || v == "true" || v == "yes"
+	}
+	if v := os.Getenv("PIONUS_PLUGINS_ENABLED"); v != "" {
+		cfg.Plugins.Enabled = cfg.Plugins.Enabled[:0]
+		for _, part := range strings.Split(v, ",") {
+			if part = strings.TrimSpace(part); part != "" {
+				cfg.Plugins.Enabled = append(cfg.Plugins.Enabled, part)
+			}
+		}
 	}
 
 	// Serving TLS from the app itself implies HTTPS, so mark cookies secure

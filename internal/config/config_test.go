@@ -41,3 +41,44 @@ session:
 		t.Fatalf("config = %+v", cfg)
 	}
 }
+
+func TestLoadPlugins(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte(`
+plugins:
+  enabled:
+    - webhook
+  config:
+    webhook:
+      url: "https://example.com/hook"
+      events: ["post.created"]
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Plugins.Enabled) != 1 || cfg.Plugins.Enabled[0] != "webhook" {
+		t.Fatalf("enabled = %+v", cfg.Plugins.Enabled)
+	}
+	if got := cfg.Plugins.Config["webhook"]["url"]; got != "https://example.com/hook" {
+		t.Fatalf("url = %v", got)
+	}
+
+	t.Setenv("PIONUS_PLUGINS_ENABLED", "telegram, webhook")
+	cfg, err = Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"telegram", "webhook"}
+	if len(cfg.Plugins.Enabled) != len(want) {
+		t.Fatalf("enabled = %+v", cfg.Plugins.Enabled)
+	}
+	for i := range want {
+		if cfg.Plugins.Enabled[i] != want[i] {
+			t.Fatalf("enabled = %+v", cfg.Plugins.Enabled)
+		}
+	}
+}

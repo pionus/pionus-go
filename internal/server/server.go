@@ -16,12 +16,28 @@ import (
 	"github.com/pionus/pionus-go/internal/auth"
 	"github.com/pionus/pionus-go/internal/config"
 	"github.com/pionus/pionus-go/internal/handler"
+	"github.com/pionus/pionus-go/internal/plugin"
 	"github.com/pionus/pionus-go/internal/store"
+	"github.com/pionus/pionus-go/plugins"
 	"github.com/pionus/pionus-go/web"
 )
 
+// App is the HTTP application plus extension lifecycle.
+type App struct {
+	*arry.Arry
+	plugins *plugin.Manager
+}
+
+// StopPlugins stops extension workers. Call it after the HTTP server exits.
+func (a *App) StopPlugins(ctx context.Context) error {
+	if a == nil || a.plugins == nil {
+		return nil
+	}
+	return a.plugins.Stop(ctx)
+}
+
 // New builds the configured HTTP application.
-func New(cfg *config.Config, db store.Store) (*arry.Arry, error) {
+func New(cfg *config.Config, db store.Store) (*App, error) {
 	if err := os.MkdirAll(cfg.Upload.Dir, 0755); err != nil {
 		return nil, err
 	}
@@ -52,7 +68,6 @@ func New(cfg *config.Config, db store.Store) (*arry.Arry, error) {
 		slog.Warn("security.secret is empty; using an ephemeral secret; password-post cookies will not survive a restart")
 	}
 	postGuard := handler.NewPostGuard(secret, cfg.Session.Secure)
-	deps := handler.NewDeps(db)
 
 	app := arry.New()
 	if err := app.SetTrustedProxies(cfg.Server.TrustedProxies); err != nil {
@@ -76,6 +91,20 @@ func New(cfg *config.Config, db store.Store) (*arry.Arry, error) {
 	app.StaticFSWithConfig("/assets", web.AssetsFS(), arry.StaticConfig{MaxAge: time.Hour})
 	app.StaticWithConfig("/uploads", arry.StaticConfig{Dir: cfg.Upload.Dir, MaxAge: 24 * time.Hour})
 	app.ViewsWithConfig(web.EngineConfig())
+
+	pluginManager, err := plugin.NewManager(plugins.Factories(), cfg.Plugins, plugin.Env{
+		Config: cfg,
+		Store:  db,
+		App:    app,
+		Log:    slog.Default(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := pluginManager.Init(context.Background()); err != nil {
+		return nil, err
+	}
+	deps := handler.NewDeps(db, pluginManager)
 
 	if cfg.AuthToken == "" {
 		slog.Warn("PIONUS_AUTH_TOKEN is empty: token-authenticated API writes are disabled")
@@ -159,10 +188,15 @@ func New(cfg *config.Config, db store.Store) (*arry.Arry, error) {
 		Store:       db,
 		Auth:        session,
 		Preview:     postGuard,
+		Events:      pluginManager,
 		UploadDir:   cfg.Upload.Dir,
 		MaxUploadMB: cfg.Upload.MaxSizeMB,
 	})
 	adminArea.Register(app)
 
-	return app, nil
+	if err := pluginManager.Start(context.Background()); err != nil {
+		return nil, err
+	}
+
+	return &App{Arry: app, plugins: pluginManager}, nil
 }

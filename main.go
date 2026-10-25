@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -82,6 +83,13 @@ func main() {
 		slog.Error("build server", "err", err)
 		os.Exit(1)
 	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := app.StopPlugins(ctx); err != nil {
+			slog.Error("stop plugins", "err", err)
+		}
+	}()
 
 	slog.Info("starting server", "addr", cfg.Server.Addr, "admin", "/admin")
 	if cfg.TLS.Cert != "" {

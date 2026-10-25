@@ -9,6 +9,13 @@ timezone: "Asia/Shanghai"
 security:
   secret: ""
 
+# Compile-time plugins. Built-in plugins are registered in plugins/plugins.go.
+plugins:
+  enabled: []
+  # config:
+  #   eventlog:
+  #     level: "info"
+
 database:
   path: "./data/pionus.db"
 

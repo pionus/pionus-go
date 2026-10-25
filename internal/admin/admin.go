@@ -14,6 +14,7 @@ import (
 	"github.com/pionus/arry/middlewares"
 	"github.com/pionus/pionus-go/internal/auth"
 	"github.com/pionus/pionus-go/internal/content"
+	"github.com/pionus/pionus-go/internal/events"
 	"github.com/pionus/pionus-go/internal/handler"
 	"github.com/pionus/pionus-go/internal/model"
 	"github.com/pionus/pionus-go/internal/store"
@@ -27,6 +28,7 @@ type Options struct {
 	Store       store.Store
 	Auth        *auth.Manager
 	Preview     *handler.PostGuard
+	Events      events.Emitter
 	UploadDir   string
 	MaxUploadMB int
 }
@@ -36,6 +38,7 @@ type Admin struct {
 	store        store.Store
 	auth         *auth.Manager
 	previewGuard *handler.PostGuard
+	events       events.Emitter
 	engine       arry.Engine
 	uploadDir    string
 	maxUpload    int64
@@ -49,10 +52,15 @@ func New(opts Options) *Admin {
 		maxMB = 10
 	}
 
+	emitter := opts.Events
+	if emitter == nil {
+		emitter = events.Nop{}
+	}
 	a := &Admin{
 		store:        opts.Store,
 		auth:         opts.Auth,
 		previewGuard: opts.Preview,
+		events:       emitter,
 		uploadDir:    opts.UploadDir,
 		maxUpload:    int64(maxMB) << 20,
 		loginLimits:  newLoginLimiter(5, 15*time.Minute),
@@ -187,6 +195,13 @@ func (a *Admin) intOption(name string, def int) int {
 
 func (a *Admin) redirect(ctx arry.Context, to string) {
 	ctx.Redirect(http.StatusFound, to)
+}
+
+func (a *Admin) emit(ctx arry.Context, event events.Event) {
+	if a.events == nil {
+		return
+	}
+	a.events.Emit(ctx.Request().Context(), event)
 }
 
 func parseID(ctx arry.Context) (int64, bool) {
