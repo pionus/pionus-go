@@ -60,9 +60,9 @@ Useful flags: `--drafts`, `--online-audit`, `--skip-links`, `--skip-images`,
 import; on `--skip-import` they are skipped unless `--force-pages` is passed, so
 a link-only run cannot overwrite later edits.
 
-The importer is idempotent: posts and comments are matched by their Typecho
-ID (`source = typecho`) and taxonomies by slug. Re-running updates posts
-instead of duplicating them.
+The importer is idempotent and runs inside a single SQLite transaction: posts
+and comments are matched by their Typecho ID (`source = typecho`) and
+taxonomies by slug. Re-running updates posts instead of duplicating them.
 
 Typecho users are imported with no usable password. Reset the owner account:
 

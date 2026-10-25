@@ -17,8 +17,10 @@ URLs are not preserved; imported content links are rewritten to the new routes.
   HTML sanitizing
 - RSS feed, notes feed, comments feed, sitemap and robots.txt
 - SQLite FTS5 trigram search, render caching and self-hosted code highlighting
-- Password-protected posts, admin password change and user roles
+- Password-protected posts, signed draft preview links, admin password change
+  and user roles
 - Deployment manifests, backup script and CI
+- Trusted-proxy aware client IPs for rate limiting
 - Admin UI at `/admin`: dashboard, Markdown editor with preview, media
   library, taxonomies, comments and settings
 - bcrypt login, server-side sessions, CSRF protection, upload MIME validation

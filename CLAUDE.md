@@ -159,6 +159,7 @@ Environment overrides:
 | `PIONUS_TIMEZONE` | IANA timezone for timestamps |
 | `PIONUS_SECRET` | HMAC secret for password-post cookies |
 | `PIONUS_ACCESS_LOG` | Access log path; `-` means stdout |
+| `PIONUS_TRUSTED_PROXIES` | Comma-separated proxy CIDRs/IPs for X-Forwarded-For |
 | `PIONUS_UPLOAD_DIR` | Upload directory |
 | `PIONUS_UPLOAD_MAX_MB` | Max upload size |
 | `PIONUS_SESSION_COOKIE` | Session cookie name |
@@ -229,6 +230,7 @@ Old Typecho URLs are intentionally not supported; they return the themed 404.
 | GET | `/article?page=N` | Archive grouped by year |
 | GET | `/article/:slug` | Post/page detail with TOC, comments, math |
 | POST | `/article/:slug/unlock` | Password-post access form |
+| GET | `/article/:slug?preview=…` | Signed anonymous draft preview |
 | POST | `/article/:slug/comment` | Native comment submission (CSRF, honeypot, time trap) |
 | GET | `/category/:slug` | Category archive |
 | GET | `/tag/:slug` | Tag archive |
@@ -346,7 +348,8 @@ and `--dry-run` to preview. The importer is idempotent (posts and
 comments match on `source` + `source_id`), preserves HTML vs Markdown
 (`posts.format`), imports categories, tags, relations, comments and views, copies
 attachments when available, imports the old `dreams` short-post table as the
-微语 timeline, applies curated page overrides from `migration/pages`, and
+微语 timeline, applies curated page overrides from `migration/pages`, and runs
+the whole import in one SQLite transaction. It
 rewrites old internal post/page/category/tag, upload and feed links to the new
 routes. Old Typecho URLs are intentionally not
 redirected. Details and current gaps are in `tools/README.md`.
@@ -379,8 +382,9 @@ redirected. Details and current gaps are in `tools/README.md`.
 - `deploy/k8s/pionus.yaml` runs one replica with a `Recreate` strategy because
   SQLite and uploads live on one PVC.
 - CI (`.github/workflows/ci.yml`) runs gofmt, vet, tests and a Docker build.
-- Production should set `PIONUS_SECRET`, `PIONUS_SESSION_SECURE=1`, and
-  `PIONUS_ACCESS_LOG=-` (stdout) behind Caddy.
+- Production should set `PIONUS_SECRET`, `PIONUS_SESSION_SECURE=1`,
+  `PIONUS_ACCESS_LOG=-` (stdout) and `PIONUS_TRUSTED_PROXIES` (the Caddy pod
+  CIDR) behind Caddy.
 
 ## Current Status / Next Steps
 
@@ -395,9 +399,8 @@ Old Typecho URLs intentionally return 404.
 
 Remaining polish:
 
-1. Anonymous draft preview links.
-2. Comment email notifications and a persistent/shared rate limiter.
-3. Import transaction wrapping (the importer is idempotent but not atomic).
-4. Narrow handler dependencies and split large store interfaces.
-5. Recover the three missing Typecho attachments if a backup exists.
-6. Point DNS at the new host and run the production migration.
+1. Comment email notifications and a persistent/shared rate limiter.
+2. Narrow handler dependencies and split large store interfaces.
+3. Inline `$...$` math (currently `$$` / `\(` / `\[` only, to avoid PHP `$`).
+4. Recover the three missing Typecho attachments if a backup exists.
+5. Point DNS at the new host and run the production migration.
