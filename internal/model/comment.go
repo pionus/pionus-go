@@ -30,6 +30,9 @@ type Comment struct {
 	// PostLocked is set by listing queries when the parent post requires a
 	// password.
 	PostLocked bool `json:"-"`
+	// PostHidden is set by listing queries when the parent post belongs to a
+	// hidden tag.
+	PostHidden bool `json:"-"`
 
 	// Source and SourceID identify imported comments.
 	Source   string `json:"-"`

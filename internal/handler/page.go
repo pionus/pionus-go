@@ -27,19 +27,26 @@ func Index(deps Deps) arry.Handler {
 	return func(ctx arry.Context) {
 		now := time.Now()
 		posts, _, err := deps.Posts.ListPosts(store.PostFilter{
-			Type:            model.PostTypePost,
-			Statuses:        []string{model.StatusPublish},
-			PublishedBefore: &now,
-			Page:            1,
-			Limit:           6,
-			WithTaxonomy:    true,
+			Type:                model.PostTypePost,
+			Statuses:            []string{model.StatusPublish},
+			PublishedBefore:     &now,
+			Page:                1,
+			Limit:               6,
+			WithTaxonomy:        true,
+			ExcludeHiddenTagged: true,
 		})
 		if err != nil {
 			slog.Error("index page", "err", err)
 		}
 
 		categories, _ := deps.Taxonomy.ListCategories()
-		tags, _ := deps.Taxonomy.ListTags()
+		allTags, _ := deps.Taxonomy.ListTags()
+		tags := make([]*model.Tag, 0, len(allTags))
+		for _, tag := range allTags {
+			if !tag.Hidden {
+				tags = append(tags, tag)
+			}
+		}
 		sort.Slice(tags, func(i, j int) bool {
 			if tags[i].PostCount != tags[j].PostCount {
 				return tags[i].PostCount > tags[j].PostCount
@@ -108,7 +115,7 @@ func CategoryArchive(deps Deps) arry.Handler {
 	}
 }
 
-func TagArchive(deps Deps) arry.Handler {
+func TagArchive(deps Deps, guard *PostGuard) arry.Handler {
 	return func(ctx arry.Context) {
 		slug := ctx.Param("slug")
 		t, err := deps.Taxonomy.GetTag(slug)
@@ -117,11 +124,16 @@ func TagArchive(deps Deps) arry.Handler {
 			return
 		}
 
+		if t.Hidden && !ctx.IsAuthed() && !guard.AllowedTag(ctx, t) {
+			renderTagPassword(ctx, deps, t, "", http.StatusOK)
+			return
+		}
+
 		data, err := listData(ctx, deps, store.PostFilter{
 			Page:    parsePage(ctx),
 			Limit:   perPage(deps, 20),
 			TagSlug: slug,
-		}, "标签："+t.Name, "/tag/"+slug, nil, false)
+		}, "标签："+t.Name, "/tag/"+slug, nil, false, t.Hidden)
 		if err != nil {
 			slog.Error("tag page", "slug", slug, "err", err)
 			ctx.Reply(http.StatusInternalServerError)
@@ -131,6 +143,9 @@ func TagArchive(deps Deps) arry.Handler {
 		data["ArchiveKind"] = "tag"
 		data["ArchiveSlug"] = slug
 		data["Tag"] = t
+		if t.Hidden {
+			data["NoIndex"] = true
+		}
 		ctx.Render(http.StatusOK, "archive.html", data)
 	}
 }
@@ -255,11 +270,17 @@ func CategoriesPage(deps Deps) arry.Handler {
 
 func TagsPage(deps Deps) arry.Handler {
 	return func(ctx arry.Context) {
-		tags, err := deps.Taxonomy.ListTags()
+		allTags, err := deps.Taxonomy.ListTags()
 		if err != nil {
 			slog.Error("tags page", "err", err)
 			ctx.Reply(http.StatusInternalServerError)
 			return
+		}
+		tags := make([]*model.Tag, 0, len(allTags))
+		for _, tag := range allTags {
+			if !tag.Hidden {
+				tags = append(tags, tag)
+			}
 		}
 		sort.Slice(tags, func(i, j int) bool {
 			if tags[i].PostCount != tags[j].PostCount {
@@ -295,11 +316,14 @@ func renderArticle(ctx arry.Context, deps Deps, guard *PostGuard, slug, errMsg s
 
 	now := time.Now()
 	preview := guard.ValidPreview(ctx, post)
+	hidden := HiddenTags(post)
 	if !post.PubliclyVisible(now) && !ctx.IsAuthed() && !preview {
 		notFound(ctx, deps, "文章不存在")
 		return
 	}
-	if post.IsLocked() && !ctx.IsAuthed() && !preview && !guard.Allowed(ctx, post) {
+	needsPostPassword := post.IsLocked() && !ctx.IsAuthed() && !preview && !guard.Allowed(ctx, post)
+	needsTagPassword := len(hidden) > 0 && !ctx.IsAuthed() && !preview && !guard.AllowedAnyTag(ctx, hidden)
+	if needsPostPassword || needsTagPassword {
 		renderPassword(ctx, deps, post, "", http.StatusOK)
 		return
 	}
@@ -381,7 +405,7 @@ func renderArticle(ctx arry.Context, deps Deps, guard *PostGuard, slug, errMsg s
 	data["Form"] = form
 	data["IsPage"] = post.Type == model.PostTypePage
 	data["Preview"] = preview
-	if preview {
+	if preview || len(hidden) > 0 {
 		data["NoIndex"] = true
 	}
 

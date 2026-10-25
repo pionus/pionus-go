@@ -50,6 +50,9 @@ type PostFilter struct {
 	WithContent bool
 	// WithTaxonomy loads categories and tags for each post.
 	WithTaxonomy bool
+	// ExcludeHiddenTagged hides posts that belong to at least one hidden tag.
+	// Public listings set it; admin/import views leave it false.
+	ExcludeHiddenTagged bool
 }
 
 // PostStore manages posts and pages.

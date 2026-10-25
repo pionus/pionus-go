@@ -48,14 +48,15 @@ func ListPosts(deps Deps) arry.Handler {
 		now := time.Now()
 
 		f := store.PostFilter{
-			Type:            model.PostTypePost,
-			Statuses:        []string{model.StatusPublish},
-			PublishedBefore: &now,
-			Page:            page,
-			Limit:           limit,
-			Query:           strings.TrimSpace(ctx.Query("q")),
-			CategorySlug:    ctx.Query("category"),
-			TagSlug:         ctx.Query("tag"),
+			Type:                model.PostTypePost,
+			Statuses:            []string{model.StatusPublish},
+			PublishedBefore:     &now,
+			Page:                page,
+			Limit:               limit,
+			Query:               strings.TrimSpace(ctx.Query("q")),
+			CategorySlug:        ctx.Query("category"),
+			TagSlug:             ctx.Query("tag"),
+			ExcludeHiddenTagged: true,
 		}
 
 		posts, total, err := deps.Posts.ListPosts(f)
@@ -91,6 +92,11 @@ func GetPost(deps Deps, guard *PostGuard) arry.Handler {
 
 		if !p.PubliclyVisible(time.Now()) && !ctx.IsAuthed() {
 			jsonError(ctx, http.StatusNotFound, "post not found")
+			return
+		}
+		hidden := HiddenTags(p)
+		if len(hidden) > 0 && !ctx.IsAuthed() && !guard.AllowedAnyTag(ctx, hidden) {
+			jsonError(ctx, http.StatusForbidden, "tag password required")
 			return
 		}
 		if p.PostPassword != "" && !ctx.IsAuthed() && !guard.Allowed(ctx, p) {

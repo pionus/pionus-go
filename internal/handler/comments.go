@@ -148,7 +148,12 @@ func PostComment(deps Deps, guard *PostGuard) arry.Handler {
 			notFound(ctx, deps, "文章不存在")
 			return
 		}
+		hidden := HiddenTags(post)
 		if post.IsLocked() && !ctx.IsAuthed() && !guard.Allowed(ctx, post) {
+			ctx.Reply(http.StatusForbidden)
+			return
+		}
+		if len(hidden) > 0 && !ctx.IsAuthed() && !guard.AllowedAnyTag(ctx, hidden) {
 			ctx.Reply(http.StatusForbidden)
 			return
 		}

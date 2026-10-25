@@ -32,12 +32,13 @@ func Feed(deps Deps) arry.Handler {
 		now := time.Now()
 
 		posts, _, err := deps.Posts.ListPosts(store.PostFilter{
-			Type:            model.PostTypePost,
-			Statuses:        []string{model.StatusPublish},
-			PublishedBefore: &now,
-			Page:            1,
-			Limit:           20,
-			WithTaxonomy:    true,
+			Type:                model.PostTypePost,
+			Statuses:            []string{model.StatusPublish},
+			PublishedBefore:     &now,
+			Page:                1,
+			Limit:               20,
+			WithTaxonomy:        true,
+			ExcludeHiddenTagged: true,
 		})
 		if err != nil {
 			slog.Error("feed posts", "err", err)
@@ -150,7 +151,7 @@ func CommentsFeed(deps Deps) arry.Handler {
 			},
 		}
 		for _, c := range comments {
-			if c.PostSlug == "" || c.PostLocked {
+			if c.PostSlug == "" || c.PostLocked || c.PostHidden {
 				continue
 			}
 			link := base + "/article/" + c.PostSlug + "#comment-" + strconv.FormatInt(c.ID, 10)
@@ -187,10 +188,11 @@ func Sitemap(deps Deps) arry.Handler {
 		page := 1
 		for {
 			posts, total, err := deps.Posts.ListPosts(store.PostFilter{
-				Statuses:        []string{model.StatusPublish},
-				PublishedBefore: &now,
-				Page:            page,
-				Limit:           200,
+				Statuses:            []string{model.StatusPublish},
+				PublishedBefore:     &now,
+				Page:                page,
+				Limit:               200,
+				ExcludeHiddenTagged: true,
 			})
 			if err != nil {
 				slog.Error("sitemap posts", "err", err)
@@ -218,6 +220,9 @@ func Sitemap(deps Deps) arry.Handler {
 		}
 		tags, _ := deps.Taxonomy.ListTags()
 		for _, t := range tags {
+			if t.Hidden {
+				continue
+			}
 			add(base+"/tag/"+url.PathEscape(t.Slug), now.Format("2006-01-02"))
 		}
 

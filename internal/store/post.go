@@ -243,6 +243,13 @@ func postWhere(f PostFilter) (string, []any) {
 		args = append(args, *f.PublishedTo)
 	}
 
+	if f.ExcludeHiddenTagged {
+		clauses = append(clauses, `NOT EXISTS (
+			SELECT 1 FROM post_tags hp
+			JOIN tags ht ON ht.id = hp.tag_id
+			WHERE hp.post_id = p.id AND ht.hidden = 1)`)
+	}
+
 	if len(clauses) == 0 {
 		return "", args
 	}
@@ -274,6 +281,9 @@ func (s *SQLiteStore) AdjacentPosts(slug string) (prev, next *model.Post, err er
 
 	newerQuery := columns + `
 		WHERE p.status = 'publish' AND p.type = ?
+		  AND NOT EXISTS (
+			SELECT 1 FROM post_tags hp JOIN tags ht ON ht.id = hp.tag_id
+			WHERE hp.post_id = p.id AND ht.hidden = 1)
 		  AND (COALESCE(p.published_at, p.created_at) > ?
 		       OR (COALESCE(p.published_at, p.created_at) = ? AND p.id > ?))
 		ORDER BY COALESCE(p.published_at, p.created_at) ASC, p.id ASC LIMIT 1`
@@ -288,6 +298,9 @@ func (s *SQLiteStore) AdjacentPosts(slug string) (prev, next *model.Post, err er
 
 	olderQuery := columns + `
 		WHERE p.status = 'publish' AND p.type = ?
+		  AND NOT EXISTS (
+			SELECT 1 FROM post_tags hp JOIN tags ht ON ht.id = hp.tag_id
+			WHERE hp.post_id = p.id AND ht.hidden = 1)
 		  AND (COALESCE(p.published_at, p.created_at) < ?
 		       OR (COALESCE(p.published_at, p.created_at) = ? AND p.id < ?))
 		ORDER BY COALESCE(p.published_at, p.created_at) DESC, p.id DESC LIMIT 1`

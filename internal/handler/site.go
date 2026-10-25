@@ -48,10 +48,11 @@ func baseData(ctx arry.Context, deps Deps, title string) map[string]any {
 	}
 
 	pages, _, _ := deps.Posts.ListPosts(store.PostFilter{
-		Type:     model.PostTypePage,
-		Statuses: []string{model.StatusPublish},
-		Page:     1,
-		Limit:    10,
+		Type:                model.PostTypePage,
+		Statuses:            []string{model.StatusPublish},
+		Page:                1,
+		Limit:               10,
+		ExcludeHiddenTagged: true,
 	})
 	navPages := make([]*model.Post, 0, len(pages))
 	for _, p := range pages {
@@ -102,7 +103,10 @@ func pageURL(base string, page int, extra url.Values) string {
 }
 
 // listData runs a public post query and builds archive data.
-func listData(ctx arry.Context, deps Deps, f store.PostFilter, title, base string, extra url.Values, groupByYear bool) (map[string]any, error) {
+func listData(ctx arry.Context, deps Deps, f store.PostFilter, title, base string, extra url.Values, groupByYear bool, includeHidden ...bool) (map[string]any, error) {
+	if len(includeHidden) == 0 || !includeHidden[0] {
+		f.ExcludeHiddenTagged = true
+	}
 	if f.Page < 1 {
 		f.Page = 1
 	}

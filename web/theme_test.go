@@ -150,6 +150,20 @@ func TestPostTemplateInlineMath(t *testing.T) {
 	}
 }
 
+func TestTagPasswordTemplate(t *testing.T) {
+	data := siteData("网安")
+	data["Tag"] = &model.Tag{Name: "网安", Slug: "security", Hidden: true}
+	data["UnlockAction"] = "/tag/security/unlock"
+	data["Error"] = "密码不正确。"
+	data["CSRF"] = "token"
+	out := renderTemplate(t, "tag-password.html", data)
+	for _, want := range []string{"网安", "这个标签下的文章需要密码", "密码不正确", `name="_csrf"`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("tag password output missing %q", want)
+		}
+	}
+}
+
 func TestNotesTemplate(t *testing.T) {
 	data := siteData("微语")
 	data["Notes"] = []map[string]any{

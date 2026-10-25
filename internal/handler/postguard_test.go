@@ -65,3 +65,39 @@ func TestPreviewToken(t *testing.T) {
 		t.Fatal("expired preview token accepted")
 	}
 }
+
+func TestTagGuard(t *testing.T) {
+	guard := NewPostGuard("secret", false)
+	tag := &model.Tag{ID: 12, Hidden: true, PasswordHash: "hash-v1"}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	ctx := arry.NewContext(req, rec)
+	if guard.AllowedTag(ctx, tag) {
+		t.Fatal("tag should be locked without a cookie")
+	}
+
+	guard.GrantTag(ctx, tag)
+	cookies := rec.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("tag grant did not set a cookie")
+	}
+
+	req2 := httptest.NewRequest(http.MethodGet, "/", nil)
+	req2.AddCookie(cookies[0])
+	ctx2 := arry.NewContext(req2, httptest.NewRecorder())
+	if !guard.AllowedTag(ctx2, tag) {
+		t.Fatal("valid tag cookie should unlock the tag")
+	}
+	if !guard.AllowedAnyTag(ctx2, []*model.Tag{tag}) {
+		t.Fatal("AllowedAnyTag rejected a valid tag cookie")
+	}
+
+	changed := &model.Tag{ID: 12, Hidden: true, PasswordHash: "hash-v2"}
+	if guard.AllowedTag(ctx2, changed) {
+		t.Fatal("tag cookie should not survive a password change")
+	}
+	if guard.AllowedTag(ctx2, &model.Tag{ID: 12, Hidden: false, PasswordHash: "hash-v1"}) {
+		t.Fatal("non-hidden tag should not be guarded")
+	}
+}

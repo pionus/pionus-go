@@ -527,3 +527,107 @@ func TestPublishedBeforeFiltersScheduledPosts(t *testing.T) {
 		t.Fatalf("order = %+v", list)
 	}
 }
+
+func TestHiddenTagVisibility(t *testing.T) {
+	s := newTestStore(t)
+
+	hidden := &model.Tag{Name: "网安", Slug: "security", Hidden: true, PasswordHash: "hash-v1"}
+	public := &model.Tag{Name: "公开", Slug: "public"}
+	if err := s.CreateTag(hidden); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CreateTag(public); err != nil {
+		t.Fatal(err)
+	}
+
+	older := mustPost(t, s, &model.Post{
+		Slug: "older", Title: "Older", Content: "older", Status: model.StatusPublish,
+		TagIDs: []int64{public.ID},
+	})
+	secret := mustPost(t, s, &model.Post{
+		Slug: "secret", Title: "Secret", Content: "secret", Status: model.StatusPublish,
+		TagIDs: []int64{hidden.ID},
+	})
+	newer := mustPost(t, s, &model.Post{
+		Slug: "newer", Title: "Newer", Content: "newer", Status: model.StatusPublish,
+		TagIDs: []int64{public.ID},
+	})
+	mixed := mustPost(t, s, &model.Post{
+		Slug: "mixed", Title: "Mixed", Content: "mixed", Status: model.StatusPublish,
+		TagIDs: []int64{public.ID, hidden.ID},
+	})
+
+	all, total, err := s.ListPosts(PostFilter{Page: 1, Limit: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 4 || len(all) != 4 {
+		t.Fatalf("admin list total=%d len=%d", total, len(all))
+	}
+
+	visible, total, err := s.ListPosts(PostFilter{Page: 1, Limit: 20, ExcludeHiddenTagged: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 2 || len(visible) != 2 {
+		t.Fatalf("public list total=%d len=%d", total, len(visible))
+	}
+	for _, post := range visible {
+		if post.Slug == secret.Slug || post.Slug == mixed.Slug {
+			t.Fatalf("hidden post leaked into public list: %s", post.Slug)
+		}
+	}
+
+	got, err := s.GetPost(secret.Slug)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Tags) != 1 || !got.Tags[0].Hidden || got.Tags[0].PasswordHash != "hash-v1" {
+		t.Fatalf("secret tags = %+v", got.Tags)
+	}
+
+	prev, next, err := s.AdjacentPosts(secret.Slug)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prev == nil || prev.Slug != newer.Slug {
+		t.Fatalf("prev = %+v, want %s", prev, newer.Slug)
+	}
+	if next == nil || next.Slug != older.Slug {
+		t.Fatalf("next = %+v, want %s", next, older.Slug)
+	}
+
+	if err := s.CreateComment(&model.Comment{
+		PostID: secret.ID, Author: "Reader", Content: "hidden comment", Status: model.CommentApproved,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	comments, _, err := s.ListComments(CommentFilter{PostID: secret.ID, Page: 1, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(comments) != 1 || !comments[0].PostHidden {
+		t.Fatalf("comment = %+v", comments)
+	}
+
+	hidden.PasswordHash = "hash-v2"
+	hidden.Hidden = false
+	if err := s.UpdateTag(hidden.Slug, hidden); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := s.GetTag(hidden.Slug)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Hidden || updated.PasswordHash != "hash-v2" {
+		t.Fatalf("updated tag = %+v", updated)
+	}
+
+	reused, err := s.UpsertTag("网安", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reused.ID != hidden.ID {
+		t.Fatalf("name lookup created duplicate tag: %+v", reused)
+	}
+}

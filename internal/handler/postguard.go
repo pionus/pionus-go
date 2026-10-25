@@ -51,8 +51,66 @@ func (g *PostGuard) Grant(ctx arry.Context, post *model.Post) {
 	})
 }
 
+// AllowedTag reports whether the request carries a valid access cookie for a
+// hidden tag.
+func (g *PostGuard) AllowedTag(ctx arry.Context, tag *model.Tag) bool {
+	if tag == nil || !tag.Hidden || tag.PasswordHash == "" {
+		return false
+	}
+	cookie, err := ctx.Request().Cookie(g.tagCookieName(tag.ID))
+	if err != nil || cookie.Value == "" {
+		return false
+	}
+	return hmac.Equal([]byte(cookie.Value), []byte(g.tagToken(tag)))
+}
+
+// GrantTag sets the access cookie for a hidden tag.
+func (g *PostGuard) GrantTag(ctx arry.Context, tag *model.Tag) {
+	ctx.SetCookie(&http.Cookie{
+		Name:     g.tagCookieName(tag.ID),
+		Value:    g.tagToken(tag),
+		Path:     "/",
+		MaxAge:   24 * 60 * 60,
+		HttpOnly: true,
+		Secure:   g.secure,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+// AllowedAnyTag reports whether any hidden tag on a post is unlocked.
+func (g *PostGuard) AllowedAnyTag(ctx arry.Context, tags []*model.Tag) bool {
+	for _, tag := range tags {
+		if g.AllowedTag(ctx, tag) {
+			return true
+		}
+	}
+	return false
+}
+
 func (g *PostGuard) cookieName(id int64) string {
 	return "pionus_post_" + strconv.FormatInt(id, 10)
+}
+
+func (g *PostGuard) tagCookieName(id int64) string {
+	return "pionus_tag_" + strconv.FormatInt(id, 10)
+}
+
+func (g *PostGuard) tagToken(tag *model.Tag) string {
+	return g.sign(fmt.Sprintf("tag:%d:%s", tag.ID, tag.PasswordHash))
+}
+
+// HiddenTags returns the hidden tags attached to a post.
+func HiddenTags(post *model.Post) []*model.Tag {
+	if post == nil {
+		return nil
+	}
+	var tags []*model.Tag
+	for _, tag := range post.Tags {
+		if tag.Hidden {
+			tags = append(tags, tag)
+		}
+	}
+	return tags
 }
 
 func (g *PostGuard) token(post *model.Post) string {
