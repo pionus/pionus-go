@@ -12,6 +12,7 @@ import (
 	"github.com/pionus/arry"
 	"github.com/pionus/pionus-go/internal/auth"
 	"github.com/pionus/pionus-go/internal/content"
+	"github.com/pionus/pionus-go/internal/events"
 	"github.com/pionus/pionus-go/internal/model"
 	"github.com/pionus/pionus-go/internal/store"
 )
@@ -120,6 +121,7 @@ func (a *Admin) postCreate(ctx arry.Context) {
 		return
 	}
 
+	a.emit(ctx, events.New(events.PostCreated, events.SourceAdmin, events.PostData{Post: p}))
 	a.redirect(ctx, fmt.Sprintf("%s/posts/%d/edit?saved=1", auth.AdminBase, p.ID))
 }
 
@@ -157,6 +159,7 @@ func (a *Admin) postUpdate(ctx arry.Context) {
 		return
 	}
 
+	a.emit(ctx, events.New(events.PostUpdated, events.SourceAdmin, events.PostData{Post: p}))
 	a.redirect(ctx, fmt.Sprintf("%s/posts/%d/edit?saved=1", auth.AdminBase, id))
 }
 
@@ -181,6 +184,7 @@ func (a *Admin) postDelete(ctx arry.Context) {
 		ctx.Reply(http.StatusInternalServerError)
 		return
 	}
+	a.emit(ctx, events.New(events.PostDeleted, events.SourceAdmin, events.PostData{Post: p}))
 	a.redirect(ctx, auth.AdminBase+"/posts?deleted=1")
 }
 

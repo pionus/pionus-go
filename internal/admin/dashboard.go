@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/pionus/arry"
+	"github.com/pionus/pionus-go/internal/events"
 	"github.com/pionus/pionus-go/internal/model"
 	"github.com/pionus/pionus-go/internal/store"
 )
@@ -119,6 +120,13 @@ func (a *Admin) commentStatus(ctx arry.Context) {
 		if !errors.Is(err, store.ErrNotFound) {
 			logErr("admin update comment", "id", id, "err", err)
 		}
+	} else if comment, err := a.store.GetComment(int64(id)); err != nil {
+		logErr("admin load updated comment", "id", id, "err", err)
+	} else {
+		a.emit(ctx, events.New(events.CommentStatusChanged, events.SourceAdmin, events.CommentStatusData{
+			Comment: comment,
+			Status:  status,
+		}))
 	}
 	a.redirect(ctx, commentsURL(form, form.PostFormValue("filter")))
 }
@@ -131,8 +139,12 @@ func (a *Admin) commentDelete(ctx arry.Context) {
 		ctx.Reply(http.StatusBadRequest)
 		return
 	}
-	if err := a.store.DeleteComment(int64(id)); err != nil && !errors.Is(err, store.ErrNotFound) {
-		logErr("admin delete comment", "id", id, "err", err)
+	if err := a.store.DeleteComment(int64(id)); err != nil {
+		if !errors.Is(err, store.ErrNotFound) {
+			logErr("admin delete comment", "id", id, "err", err)
+		}
+	} else {
+		a.emit(ctx, events.New(events.CommentDeleted, events.SourceAdmin, events.DeletedData{ID: int64(id)}))
 	}
 	a.redirect(ctx, commentsURL(form, form.PostFormValue("filter")))
 }

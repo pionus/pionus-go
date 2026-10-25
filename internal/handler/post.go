@@ -10,6 +10,7 @@ import (
 
 	"github.com/pionus/arry"
 	"github.com/pionus/pionus-go/internal/content"
+	"github.com/pionus/pionus-go/internal/events"
 	"github.com/pionus/pionus-go/internal/model"
 	"github.com/pionus/pionus-go/internal/store"
 )
@@ -135,6 +136,7 @@ func CreatePost(deps Deps) arry.Handler {
 			created = p
 		}
 		ctx.JSON(http.StatusCreated, created)
+		deps.Emit(ctx, events.New(events.PostCreated, events.SourceAPI, events.PostData{Post: created}))
 	}
 }
 
@@ -189,6 +191,7 @@ func UpdatePost(deps Deps) arry.Handler {
 			updated = p
 		}
 		ctx.JSON(http.StatusOK, updated)
+		deps.Emit(ctx, events.New(events.PostUpdated, events.SourceAPI, events.PostData{Post: updated}))
 	}
 }
 
@@ -200,6 +203,16 @@ func DeletePost(deps Deps) arry.Handler {
 		}
 
 		slug := ctx.Param("slug")
+		p, err := deps.Posts.GetPost(slug)
+		if err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				jsonError(ctx, http.StatusNotFound, "post not found")
+				return
+			}
+			slog.Error("load post for delete", "slug", slug, "err", err)
+			jsonError(ctx, http.StatusInternalServerError, "failed to delete post")
+			return
+		}
 		if err := deps.PostWrites.DeletePost(slug); err != nil {
 			if errors.Is(err, store.ErrNotFound) {
 				jsonError(ctx, http.StatusNotFound, "post not found")
@@ -211,5 +224,6 @@ func DeletePost(deps Deps) arry.Handler {
 		}
 
 		ctx.JSON(http.StatusOK, map[string]string{"message": "deleted"})
+		deps.Emit(ctx, events.New(events.PostDeleted, events.SourceAPI, events.PostData{Post: p}))
 	}
 }

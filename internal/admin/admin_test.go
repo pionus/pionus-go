@@ -2,6 +2,7 @@ package admin
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"image"
 	"image/png"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/pionus/arry"
 	"github.com/pionus/pionus-go/internal/auth"
+	"github.com/pionus/pionus-go/internal/events"
 	"github.com/pionus/pionus-go/internal/model"
 	"github.com/pionus/pionus-go/internal/store"
 )
@@ -31,6 +33,10 @@ type testEnv struct {
 }
 
 func newTestEnv(t *testing.T) *testEnv {
+	return newTestEnvWithEvents(t, events.Nop{})
+}
+
+func newTestEnvWithEvents(t *testing.T, emitter events.Emitter) *testEnv {
 	t.Helper()
 
 	db, err := store.NewSQLite(filepath.Join(t.TempDir(), "test.db"))
@@ -43,6 +49,7 @@ func newTestEnv(t *testing.T) *testEnv {
 	a := New(Options{
 		Store:       db,
 		Auth:        manager,
+		Events:      emitter,
 		UploadDir:   t.TempDir(),
 		MaxUploadMB: 1,
 	})
@@ -318,6 +325,41 @@ func TestAdminPreviewInlineMath(t *testing.T) {
 	resp.Body.Close()
 	if strings.Contains(string(body), `\(x^2\)`) {
 		t.Fatalf("preview enabled math without opt-in: %s", body)
+	}
+}
+
+type captureAdminEvents struct {
+	events []events.Event
+}
+
+func (c *captureAdminEvents) Emit(_ context.Context, event events.Event) {
+	c.events = append(c.events, event)
+}
+
+func TestAdminEmitsPostEvents(t *testing.T) {
+	emitter := &captureAdminEvents{}
+	e := newTestEnvWithEvents(t, emitter)
+	e.setup(t)
+
+	resp := e.postForm(t, "/admin/posts", url.Values{
+		"title":   {"事件文章"},
+		"slug":    {"event-post"},
+		"content": {"正文"},
+		"status":  {"publish"},
+		"type":    {"post"},
+	})
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("create status = %d", resp.StatusCode)
+	}
+	if len(emitter.events) != 1 ||
+		emitter.events[0].Type != events.PostCreated ||
+		emitter.events[0].Source != events.SourceAdmin {
+		t.Fatalf("events = %+v", emitter.events)
+	}
+	data, ok := emitter.events[0].Data.(events.PostData)
+	if !ok || data.Post == nil || data.Post.Slug != "event-post" {
+		t.Fatalf("data = %#v", emitter.events[0].Data)
 	}
 }
 

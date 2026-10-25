@@ -15,6 +15,7 @@ import (
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/pionus/arry"
 	"github.com/pionus/arry/middlewares"
+	"github.com/pionus/pionus-go/internal/events"
 	"github.com/pionus/pionus-go/internal/model"
 	"github.com/pionus/pionus-go/internal/store"
 )
@@ -244,6 +245,7 @@ func PostComment(deps Deps, guard *PostGuard) arry.Handler {
 			message = "pending"
 		}
 		ctx.Redirect(http.StatusSeeOther, "/article/"+slug+"?comment="+message+"#comments")
+		deps.Emit(ctx, events.New(events.CommentCreated, events.SourceWeb, events.CommentData{Comment: comment}))
 	}
 }
 
