@@ -13,7 +13,7 @@
     <span class="friend-avatar-wrap" aria-hidden="true"><span class="friend-avatar-fallback">Y</span><img class="friend-avatar" src="https://avatars.githubusercontent.com/u/1787249?v=4&s=96" alt="" loading="lazy"></span>
     <span class="friend-text"><strong>Yizero</strong><span>github.com/yizero</span></span>
   </a>
-  <a class="friend-link" href="https://www.galesun.com/" target="_blank" rel="noopener noreferrer">
+  <a class="friend-link" href="https://galesun.com/" target="_blank" rel="noopener noreferrer">
     <span class="friend-avatar-wrap" aria-hidden="true"><span class="friend-avatar-fallback">G</span><img class="friend-avatar" src="https://avatars.githubusercontent.com/u/10398241?v=4&s=96" alt="" loading="lazy"></span>
     <span class="friend-text"><strong>GaleSun</strong><span>galesun.com</span></span>
   </a>
