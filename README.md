@@ -18,8 +18,8 @@ URLs are not preserved; imported content links are rewritten to the new routes.
   HTML sanitizing
 - RSS feed, notes feed, comments feed, sitemap and robots.txt
 - SQLite FTS5 trigram search, render caching and self-hosted code highlighting
-- Password-protected posts, signed draft preview links, admin password change
-  and user roles
+- Password-protected posts and tags, signed draft preview links, admin password
+  change and user roles
 - Deployment manifests, backup script and CI
 - Trusted-proxy aware client IPs for rate limiting
 - Compile-time plugins with lifecycle hooks and a typed post/comment/note
@@ -107,6 +107,8 @@ native comments, JSON API, admin UI, authentication, uploads, Typecho import,
 RSS/sitemap, password-protected posts, signed draft previews, user management,
 FTS5 search, deployment/backup/CI assets and image audit.
 
-Design notes for the narrowed handler interfaces and inline math are in
-[docs/backlog.md](docs/backlog.md). Plugin and event extension points are
-documented in [docs/plugins.md](docs/plugins.md).
+Hidden tag configuration and behavior are documented in
+[docs/tag-protection.md](docs/tag-protection.md). Design notes for the narrowed
+handler interfaces and inline math are in [docs/backlog.md](docs/backlog.md).
+Plugin and event extension points are documented in
+[docs/plugins.md](docs/plugins.md).
