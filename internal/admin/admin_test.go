@@ -407,6 +407,78 @@ func TestCategoryAndTagManagement(t *testing.T) {
 	}
 }
 
+func TestAdminHiddenTag(t *testing.T) {
+	e := newTestEnv(t)
+	e.setup(t)
+
+	resp := e.postForm(t, "/admin/tags/create", url.Values{
+		"name":     {"网安"},
+		"slug":     {"security"},
+		"hidden":   {"1"},
+		"password": {"tag-pass"},
+	})
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("create status = %d", resp.StatusCode)
+	}
+
+	tag, err := e.store.GetTag("security")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !tag.Hidden || !tag.HasPassword() {
+		t.Fatalf("tag = %+v", tag)
+	}
+	if tag.PasswordHash == "tag-pass" || !auth.CheckPassword(tag.PasswordHash, "tag-pass") {
+		t.Fatal("tag password was not hashed correctly")
+	}
+
+	resp = e.get(t, "/admin/tags")
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), "网安") || !strings.Contains(string(body), "已设置") {
+		t.Fatalf("tags page status=%d body=%s", resp.StatusCode, body)
+	}
+
+	// Leaving the password empty keeps the existing hash.
+	resp = e.postForm(t, "/admin/tags/update", url.Values{
+		"original_slug": {"security"},
+		"name":          {"网安"},
+		"slug":          {"security"},
+		"hidden":        {"1"},
+	})
+	resp.Body.Close()
+	tag, _ = e.store.GetTag("security")
+	if !tag.Hidden || !auth.CheckPassword(tag.PasswordHash, "tag-pass") {
+		t.Fatalf("tag after keep = %+v", tag)
+	}
+
+	// A new password replaces the old one.
+	resp = e.postForm(t, "/admin/tags/update", url.Values{
+		"original_slug": {"security"},
+		"name":          {"网安"},
+		"slug":          {"security"},
+		"hidden":        {"1"},
+		"password":      {"new-tag-pass"},
+	})
+	resp.Body.Close()
+	tag, _ = e.store.GetTag("security")
+	if !auth.CheckPassword(tag.PasswordHash, "new-tag-pass") || auth.CheckPassword(tag.PasswordHash, "tag-pass") {
+		t.Fatal("tag password was not replaced")
+	}
+
+	// Hidden tags cannot be created without a password.
+	resp = e.postForm(t, "/admin/tags/create", url.Values{
+		"name":   {"无密码"},
+		"slug":   {"no-password"},
+		"hidden": {"1"},
+	})
+	resp.Body.Close()
+	if _, err := e.store.GetTag("no-password"); err == nil {
+		t.Fatal("hidden tag without password was created")
+	}
+}
+
 func TestSettingsSave(t *testing.T) {
 	e := newTestEnv(t)
 	e.setup(t)

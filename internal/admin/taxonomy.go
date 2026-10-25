@@ -105,6 +105,12 @@ func (a *Admin) tagList(ctx arry.Context) {
 
 	data := a.base(ctx, "标签")
 	data["Tags"] = tags
+	switch ctx.Query("error") {
+	case "password":
+		data["Error"] = "隐藏标签必须设置访问密码。"
+	case "save":
+		data["Error"] = "保存标签失败，请稍后再试。"
+	}
 	a.render(ctx, http.StatusOK, "tags.html", data)
 }
 
@@ -116,8 +122,30 @@ func (a *Admin) tagCreate(ctx arry.Context) {
 		a.redirect(ctx, auth.AdminBase+"/tags")
 		return
 	}
-	if _, err := a.store.UpsertTag(name, slug); err != nil {
+	if slug == "" {
+		slug = model.Slugify(name)
+	}
+	hidden := form.PostFormValue("hidden") != ""
+	password := form.PostFormValue("password")
+	hash := ""
+	if password != "" {
+		var err error
+		hash, err = auth.HashPassword(password)
+		if err != nil {
+			logErr("admin hash tag password", "err", err)
+			a.redirect(ctx, auth.AdminBase+"/tags?error=save")
+			return
+		}
+	}
+	if hidden && hash == "" {
+		a.redirect(ctx, auth.AdminBase+"/tags?error=password")
+		return
+	}
+	t := &model.Tag{Name: name, Slug: slug, Hidden: hidden, PasswordHash: hash}
+	if err := a.store.CreateTag(t); err != nil {
 		logErr("admin create tag", "err", err)
+		a.redirect(ctx, auth.AdminBase+"/tags?error=save")
+		return
 	}
 	a.redirect(ctx, auth.AdminBase+"/tags?saved=1")
 }
@@ -136,10 +164,33 @@ func (a *Admin) tagUpdate(ctx arry.Context) {
 		slug = model.Slugify(name)
 	}
 
-	t := &model.Tag{Name: name, Slug: slug}
+	existing, err := a.store.GetTag(original)
+	if err != nil {
+		logErr("admin load tag", "slug", original, "err", err)
+		a.redirect(ctx, auth.AdminBase+"/tags?error=save")
+		return
+	}
+
+	hidden := form.PostFormValue("hidden") != ""
+	password := form.PostFormValue("password")
+	hash := existing.PasswordHash
+	if password != "" {
+		hash, err = auth.HashPassword(password)
+		if err != nil {
+			logErr("admin hash tag password", "err", err)
+			a.redirect(ctx, auth.AdminBase+"/tags?error=save")
+			return
+		}
+	}
+	if hidden && hash == "" {
+		a.redirect(ctx, auth.AdminBase+"/tags?error=password")
+		return
+	}
+
+	t := &model.Tag{Name: name, Slug: slug, Hidden: hidden, PasswordHash: hash}
 	if err := a.store.UpdateTag(original, t); err != nil {
 		logErr("admin update tag", "slug", original, "err", err)
-		a.redirect(ctx, auth.AdminBase+"/tags")
+		a.redirect(ctx, auth.AdminBase+"/tags?error=save")
 		return
 	}
 	a.redirect(ctx, auth.AdminBase+"/tags?saved=1")

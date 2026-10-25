@@ -2,6 +2,7 @@
 
 {{define "content"}}
 <h1>标签</h1>
+{{if .Error}}<div class="error">{{.Error}}</div>{{end}}
 
 <div class="panel">
   <h2>新建标签</h2>
@@ -16,10 +17,18 @@
         <label for="new-slug">Slug</label>
         <input id="new-slug" type="text" name="slug" placeholder="留空自动生成">
       </div>
+      <div>
+        <label for="new-password">访问密码</label>
+        <input id="new-password" type="password" name="password" autocomplete="new-password" placeholder="隐藏标签必填">
+      </div>
       <div style="flex:0 0 auto;align-self:end">
         <button class="btn primary" type="submit">创建</button>
       </div>
     </div>
+    <label class="check">
+      <input type="checkbox" name="hidden" value="1">
+      隐藏标签（文章不出现在公开列表，需要密码访问）
+    </label>
   </form>
 </div>
 
@@ -33,13 +42,15 @@
   </form>
   {{end}}
   <table>
-    <thead><tr><th>名称</th><th>Slug</th><th>文章</th><th></th></tr></thead>
+    <thead><tr><th>名称</th><th>Slug</th><th>文章</th><th>隐藏</th><th>访问密码</th><th></th></tr></thead>
     <tbody>
     {{range .Tags}}
       <tr>
         <td><input form="tag-{{.ID}}" type="text" name="name" value="{{.Name}}" required></td>
         <td><input form="tag-{{.ID}}" type="text" name="slug" value="{{.Slug}}" required></td>
         <td class="muted">{{.PostCount}}</td>
+        <td><input form="tag-{{.ID}}" type="checkbox" name="hidden" value="1" {{if .Hidden}}checked{{end}}></td>
+        <td><input form="tag-{{.ID}}" type="password" name="password" autocomplete="new-password" placeholder="{{if .PasswordHash}}已设置，留空保留{{else}}设置密码{{end}}"></td>
         <td class="actions">
           <button form="tag-{{.ID}}" class="btn small" type="submit">保存</button>
           <form class="inline" method="post" action="/admin/tags/delete">

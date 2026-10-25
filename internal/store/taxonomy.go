@@ -119,7 +119,8 @@ func (s *SQLiteStore) DeleteCategory(slug string) error {
 
 func (s *SQLiteStore) ListTags() ([]*model.Tag, error) {
 	rows, err := s.db.Query(`
-		SELECT t.id, t.name, t.slug, t.created_at, COUNT(DISTINCT pt.post_id) AS post_count
+		SELECT t.id, t.name, t.slug, t.hidden, t.password_hash, t.created_at,
+		       COUNT(DISTINCT pt.post_id) AS post_count
 		FROM tags t
 		LEFT JOIN post_tags pt ON pt.tag_id = t.id
 		GROUP BY t.id
@@ -142,7 +143,8 @@ func (s *SQLiteStore) ListTags() ([]*model.Tag, error) {
 
 func (s *SQLiteStore) GetTag(slug string) (*model.Tag, error) {
 	t, err := scanTag(s.db.QueryRow(`
-		SELECT t.id, t.name, t.slug, t.created_at, COUNT(DISTINCT pt.post_id) AS post_count
+		SELECT t.id, t.name, t.slug, t.hidden, t.password_hash, t.created_at,
+		       COUNT(DISTINCT pt.post_id) AS post_count
 		FROM tags t
 		LEFT JOIN post_tags pt ON pt.tag_id = t.id
 		WHERE t.slug = ?
@@ -158,9 +160,13 @@ func (s *SQLiteStore) GetTag(slug string) (*model.Tag, error) {
 
 func scanTag(sc scanner) (*model.Tag, error) {
 	t := &model.Tag{}
-	if err := sc.Scan(&t.ID, &t.Name, &t.Slug, &t.CreatedAt, &t.PostCount); err != nil {
+	var hidden int
+	if err := sc.Scan(
+		&t.ID, &t.Name, &t.Slug, &hidden, &t.PasswordHash, &t.CreatedAt, &t.PostCount,
+	); err != nil {
 		return nil, err
 	}
+	t.Hidden = hidden != 0
 	return t, nil
 }
 
@@ -169,8 +175,9 @@ func (s *SQLiteStore) CreateTag(t *model.Tag) error {
 		t.CreatedAt = time.Now()
 	}
 	res, err := s.db.Exec(
-		`INSERT INTO tags (name, slug, created_at) VALUES (?, ?, ?)`,
-		t.Name, t.Slug, t.CreatedAt,
+		`INSERT INTO tags (name, slug, hidden, password_hash, created_at)
+		 VALUES (?, ?, ?, ?, ?)`,
+		t.Name, t.Slug, boolInt(t.Hidden), t.PasswordHash, t.CreatedAt,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -184,7 +191,8 @@ func (s *SQLiteStore) CreateTag(t *model.Tag) error {
 
 func (s *SQLiteStore) UpdateTag(slug string, t *model.Tag) error {
 	res, err := s.db.Exec(
-		`UPDATE tags SET name = ?, slug = ? WHERE slug = ?`, t.Name, t.Slug, slug,
+		`UPDATE tags SET name = ?, slug = ?, hidden = ?, password_hash = ? WHERE slug = ?`,
+		t.Name, t.Slug, boolInt(t.Hidden), t.PasswordHash, slug,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -211,9 +219,35 @@ func (s *SQLiteStore) DeleteTag(slug string) error {
 	return nil
 }
 
+func (s *SQLiteStore) getTagByName(name string) (*model.Tag, error) {
+	t, err := scanTag(s.db.QueryRow(`
+		SELECT t.id, t.name, t.slug, t.hidden, t.password_hash, t.created_at,
+		       COUNT(DISTINCT pt.post_id) AS post_count
+		FROM tags t
+		LEFT JOIN post_tags pt ON pt.tag_id = t.id
+		WHERE t.name = ?
+		GROUP BY t.id
+		ORDER BY t.id ASC
+		LIMIT 1`, name))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get tag by name: %w", err)
+	}
+	return t, nil
+}
+
 func (s *SQLiteStore) UpsertTag(name, slug string) (*model.Tag, error) {
 	name = strings.TrimSpace(name)
 	if slug == "" {
+		// The editor supplies names, not slugs. Reusing a tag by name avoids
+		// creating a duplicate when its slug was customized in admin.
+		if t, err := s.getTagByName(name); err == nil {
+			return t, nil
+		} else if !errors.Is(err, ErrNotFound) {
+			return nil, err
+		}
 		slug = model.Slugify(name)
 	}
 	if slug == "" {
@@ -300,7 +334,7 @@ func (s *SQLiteStore) postTagsBatch(ids []int64) (map[int64][]*model.Tag, error)
 		args[i] = id
 	}
 	rows, err := s.db.Query(`
-		SELECT pt.post_id, t.id, t.name, t.slug, t.created_at,
+		SELECT pt.post_id, t.id, t.name, t.slug, t.hidden, t.password_hash, t.created_at,
 		       (SELECT COUNT(*) FROM post_tags pt2 WHERE pt2.tag_id = t.id) AS post_count
 		FROM post_tags pt
 		JOIN tags t ON t.id = pt.tag_id
@@ -314,9 +348,14 @@ func (s *SQLiteStore) postTagsBatch(ids []int64) (map[int64][]*model.Tag, error)
 	for rows.Next() {
 		var postID int64
 		t := &model.Tag{}
-		if err := rows.Scan(&postID, &t.ID, &t.Name, &t.Slug, &t.CreatedAt, &t.PostCount); err != nil {
+		var hidden int
+		if err := rows.Scan(
+			&postID, &t.ID, &t.Name, &t.Slug, &hidden, &t.PasswordHash,
+			&t.CreatedAt, &t.PostCount,
+		); err != nil {
 			return nil, fmt.Errorf("scan batch tag: %w", err)
 		}
+		t.Hidden = hidden != 0
 		out[postID] = append(out[postID], t)
 	}
 	return out, rows.Err()
@@ -350,7 +389,8 @@ func (s *SQLiteStore) PostCategories(postID int64) ([]*model.Category, error) {
 
 func (s *SQLiteStore) PostTags(postID int64) ([]*model.Tag, error) {
 	rows, err := s.db.Query(`
-		SELECT t.id, t.name, t.slug, t.created_at, COUNT(DISTINCT pt2.post_id) AS post_count
+		SELECT t.id, t.name, t.slug, t.hidden, t.password_hash, t.created_at,
+		       COUNT(DISTINCT pt2.post_id) AS post_count
 		FROM tags t
 		JOIN post_tags pt ON pt.tag_id = t.id
 		LEFT JOIN post_tags pt2 ON pt2.tag_id = t.id
