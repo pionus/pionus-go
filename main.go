@@ -16,6 +16,7 @@ import (
 	"github.com/pionus/pionus-go/internal/model"
 	"github.com/pionus/pionus-go/internal/server"
 	"github.com/pionus/pionus-go/internal/store"
+	"github.com/pionus/pionus-go/internal/version"
 )
 
 func main() {
@@ -26,7 +27,13 @@ func main() {
 	adminEmail := flag.String("admin-email", "", "email for -create-admin")
 	auditImages := flag.Bool("audit-images", false, "report missing local images and external image hosts")
 	auditOnline := flag.Bool("audit-images-online", false, "also check external image URLs while auditing")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version.String())
+		return
+	}
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
@@ -91,7 +98,7 @@ func main() {
 		}
 	}()
 
-	slog.Info("starting server", "addr", cfg.Server.Addr, "admin", "/admin")
+	slog.Info("starting server", "version", version.Version, "addr", cfg.Server.Addr, "admin", "/admin")
 	if cfg.TLS.Cert != "" {
 		// StartTLS uses autocert with the configured domain whitelist.
 		if err := app.StartTLS(cfg.Server.Addr, cfg.TLS.Cert); err != nil {

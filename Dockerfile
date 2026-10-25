@@ -1,13 +1,26 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.25-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
+
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+ARG VERSION=0.1.0
+ARG COMMIT=dev
+ARG BUILD_DATE=unknown
 
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/pionus . \
-    && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/pionus-migrate ./cmd/pionus-migrate
+
+RUN LDFLAGS="-s -w \
+    -X github.com/pionus/pionus-go/internal/version.Version=${VERSION} \
+    -X github.com/pionus/pionus-go/internal/version.Commit=${COMMIT} \
+    -X github.com/pionus/pionus-go/internal/version.BuildDate=${BUILD_DATE}" \
+    && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+       go build -trimpath -ldflags "$LDFLAGS" -o /out/pionus . \
+    && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+       go build -trimpath -ldflags "$LDFLAGS" -o /out/pionus-migrate ./cmd/pionus-migrate
 
 FROM alpine:3.22
 

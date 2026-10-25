@@ -18,6 +18,7 @@ import (
 	"github.com/pionus/pionus-go/internal/handler"
 	"github.com/pionus/pionus-go/internal/plugin"
 	"github.com/pionus/pionus-go/internal/store"
+	"github.com/pionus/pionus-go/internal/version"
 	"github.com/pionus/pionus-go/plugins"
 	"github.com/pionus/pionus-go/web"
 )
@@ -129,7 +130,7 @@ func New(cfg *config.Config, db store.Store) (*App, error) {
 			ctx.JSON(http.StatusServiceUnavailable, map[string]string{"status": "unavailable"})
 			return
 		}
-		ctx.JSON(http.StatusOK, map[string]string{"status": "ok"})
+		ctx.JSON(http.StatusOK, map[string]string{"status": "ok", "version": version.Version})
 	})
 
 	commentCSRF := middlewares.CSRFWithConfig(middlewares.CSRFConfig{
