@@ -11,7 +11,8 @@ URLs are not preserved; imported content links are rewritten to the new routes.
 - Categories, tags, threaded comments with moderation
 - 微语 timeline for short posts, with a simple admin composer and permalinks
 - Paper & Ink public theme (embedded): archive, category/tag/date pages,
-  search, TOC, code copy, KaTeX math, dark mode, broken-image placeholders
+  search, TOC, code copy, KaTeX display math plus opt-in inline `$...$`,
+  dark mode, broken-image placeholders
 - 传送门 friend-links page and 微语 timeline
 - Native threaded comments with moderation, CSRF, honeypot, rate limiting and
   HTML sanitizing
@@ -104,5 +105,6 @@ native comments, JSON API, admin UI, authentication, uploads, Typecho import,
 RSS/sitemap, password-protected posts, signed draft previews, user management,
 FTS5 search, deployment/backup/CI assets and image audit.
 
-Deferred design work is tracked in [docs/backlog.md](docs/backlog.md), including
-handler interface boundaries and inline `$...$` math.
+Design notes for the narrowed handler interfaces and inline math are in
+[docs/backlog.md](docs/backlog.md). The public handlers depend on small
+per-domain interfaces; the admin intentionally keeps the full store.
