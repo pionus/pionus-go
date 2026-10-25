@@ -409,7 +409,24 @@ func renderArticle(ctx arry.Context, deps Deps, guard *PostGuard, slug, errMsg s
 		data["NoIndex"] = true
 	}
 
-	ctx.Render(http.StatusOK, "post.html", data)
+	templateName := "post.html"
+	if post.Type == model.PostTypePage && post.Slug == "links" {
+		if deps.Friends == nil {
+			slog.Error("friend links page: store is not configured")
+			ctx.Reply(http.StatusInternalServerError)
+			return
+		}
+		friends, err := deps.Friends.ListFriendLinks(false)
+		if err != nil {
+			slog.Error("friend links page", "err", err)
+			ctx.Reply(http.StatusInternalServerError)
+			return
+		}
+		data["FriendLinks"] = friends
+		templateName = "links.html"
+	}
+
+	ctx.Render(http.StatusOK, templateName, data)
 }
 
 func commentsEnabled(deps Deps) bool {

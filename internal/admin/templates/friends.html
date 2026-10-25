@@ -1,0 +1,77 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<h1>友链</h1>
+{{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+
+<div class="panel">
+  <h2>添加友链</h2>
+  <form method="post" action="/admin/friends/create">
+    <input type="hidden" name="_csrf" value="{{.CSRF}}">
+    <div class="row">
+      <div>
+        <label for="new-name">名称</label>
+        <input id="new-name" type="text" name="name" required maxlength="50">
+      </div>
+      <div>
+        <label for="new-url">链接</label>
+        <input id="new-url" type="url" name="url" required placeholder="https://example.com/">
+      </div>
+      <div>
+        <label for="new-avatar">头像 URL</label>
+        <input id="new-avatar" type="url" name="avatar" placeholder="https://...">
+      </div>
+      <div>
+        <label for="new-sort">排序</label>
+        <input id="new-sort" type="number" name="sort_order" value="0">
+      </div>
+    </div>
+    <div class="field">
+      <label for="new-description">描述</label>
+      <input id="new-description" type="text" name="description" maxlength="120" placeholder="站点或 GitHub 地址">
+    </div>
+    <label class="check"><input type="checkbox" name="visible" value="1" checked> 显示在友链页面</label>
+    <button class="btn primary" type="submit">添加</button>
+  </form>
+</div>
+
+<div class="panel">
+  <div class="page-head"><h2>全部友链</h2><span class="muted">共 {{len .Friends}} 个</span></div>
+  {{if .Friends}}
+  {{range .Friends}}
+  <form id="friend-{{.ID}}" method="post" action="/admin/friends/update">
+    <input type="hidden" name="_csrf" value="{{$.CSRF}}">
+    <input type="hidden" name="id" value="{{.ID}}">
+  </form>
+  {{end}}
+  <table>
+    <thead><tr><th>名称</th><th>链接</th><th>头像</th><th>描述</th><th>排序</th><th>显示</th><th></th></tr></thead>
+    <tbody>
+    {{range .Friends}}
+      <tr>
+        <td><input form="friend-{{.ID}}" type="text" name="name" value="{{.Name}}" required maxlength="50"></td>
+        <td><input form="friend-{{.ID}}" type="url" name="url" value="{{.URL}}" required></td>
+        <td>
+          {{if .Avatar}}<img src="{{.Avatar}}" alt="" style="width:32px;height:32px;border-radius:50%;object-fit:cover;display:block;margin-bottom:4px">{{end}}
+          <input form="friend-{{.ID}}" type="url" name="avatar" value="{{.Avatar}}" placeholder="可选">
+        </td>
+        <td><input form="friend-{{.ID}}" type="text" name="description" value="{{.Description}}" maxlength="120"></td>
+        <td><input form="friend-{{.ID}}" type="number" name="sort_order" value="{{.SortOrder}}" style="width:80px"></td>
+        <td><input form="friend-{{.ID}}" type="checkbox" name="visible" value="1" {{if .Visible}}checked{{end}}></td>
+        <td class="actions">
+          <button form="friend-{{.ID}}" class="btn small" type="submit">保存</button>
+          <form class="inline" method="post" action="/admin/friends/delete">
+            <input type="hidden" name="_csrf" value="{{$.CSRF}}">
+            <input type="hidden" name="id" value="{{.ID}}">
+            <button class="btn small danger" type="submit" onclick="return confirm('删除这个友链？')">删除</button>
+          </form>
+        </td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="muted">还没有友链。</p>
+  {{end}}
+</div>
+{{end}}

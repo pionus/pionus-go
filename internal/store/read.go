@@ -50,3 +50,8 @@ type NoteReader interface {
 type OptionReader interface {
 	GetOption(name string) (string, error)
 }
+
+// FriendLinkReader lists managed friend links.
+type FriendLinkReader interface {
+	ListFriendLinks(includeHidden bool) ([]*model.FriendLink, error)
+}

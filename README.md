@@ -14,7 +14,7 @@ redirected with the optional `typecho-redirects` plugin.
 - Paper & Ink public theme (embedded, with external theme overlay): archive,
   category/tag/date pages, search, TOC, code copy, KaTeX display math plus
   opt-in inline `$...$`, dark mode, broken-image placeholders
-- 传送门 friend-links page and 微语 timeline
+- Managed 传送门 friend links and 微语 timeline
 - Native threaded comments with moderation, CSRF, honeypot, rate limiting and
   HTML sanitizing
 - RSS feed, notes feed, comments feed, sitemap and robots.txt
@@ -128,6 +128,7 @@ documented in:
 - [Releases and images](docs/release.md)
 - [Typecho migration](docs/typecho-migration.md)
 - [Hidden tags](docs/tag-protection.md)
+- [Friend links](docs/friend-links.md)
 - [External themes](docs/themes.md)
 - [Plugins and events](docs/plugins.md)
 - [Design notes](docs/backlog.md)

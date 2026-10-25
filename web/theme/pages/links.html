@@ -1,0 +1,37 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<article class="post">
+  <header class="post-head">
+    {{if .Preview}}<div class="preview-banner">预览模式 · 这个页面尚未公开</div>{{end}}
+    {{if .Post.Categories}}
+    <div class="cats">
+      {{range .Post.Categories}}<a href="/category/{{.Slug}}">{{.Name}}</a>{{end}}
+    </div>
+    {{end}}
+    <h1>{{.Post.Title}}</h1>
+    <p class="post-meta">
+      {{if .Post.Author}}<span>{{.Post.Author}}</span>{{end}}
+      <time datetime="{{.Post.DisplayTime.Format "2006-01-02T15:04:05Z07:00"}}">{{date .Post.DisplayTime}}</time>
+    </p>
+  </header>
+
+  <div class="post-body">
+    <div class="prose">{{.Rendered.HTML}}</div>
+
+    <div class="friend-links">
+      {{range .FriendLinks}}
+      <a class="friend-link" href="{{.URL}}" target="_blank" rel="noopener noreferrer">
+        <span class="friend-avatar-wrap" aria-hidden="true">
+          <span class="friend-avatar-fallback">{{.Initial}}</span>
+          {{if .Avatar}}<img class="friend-avatar" src="{{.Avatar}}" alt="" loading="lazy">{{end}}
+        </span>
+        <span class="friend-text"><strong>{{.Name}}</strong><span>{{.Description}}</span></span>
+      </a>
+      {{end}}
+    </div>
+  </div>
+</article>
+{{end}}
+
+{{define "scripts"}}{{end}}

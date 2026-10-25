@@ -23,6 +23,7 @@ type Store interface {
 	MediaStore
 	NoteStore
 	OptionStore
+	FriendLinkStore
 	Ping(ctx context.Context) error
 	Close() error
 }
@@ -149,4 +150,13 @@ type OptionStore interface {
 	OptionReader
 	SetOption(name, value string) error
 	AllOptions() (map[string]string, error)
+}
+
+// FriendLinkStore manages the public friend links page.
+type FriendLinkStore interface {
+	FriendLinkReader
+	GetFriendLink(id int64) (*model.FriendLink, error)
+	CreateFriendLink(f *model.FriendLink) error
+	UpdateFriendLink(f *model.FriendLink) error
+	DeleteFriendLink(id int64) error
 }

@@ -523,6 +523,67 @@ func TestAdminImportBundle(t *testing.T) {
 	}
 }
 
+func TestAdminFriendLinks(t *testing.T) {
+	e := newTestEnv(t)
+	e.setup(t)
+
+	resp := e.get(t, "/admin/friends")
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), "Akawa") {
+		t.Fatalf("friends page status=%d body=%s", resp.StatusCode, body)
+	}
+
+	resp = e.postForm(t, "/admin/friends/create", url.Values{
+		"name":        {"Test Friend"},
+		"url":         {"https://friend.example/"},
+		"avatar":      {"https://avatars.githubusercontent.com/u/1?v=4"},
+		"description": {"friend.example"},
+		"sort_order":  {"5"},
+		"visible":     {"1"},
+	})
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("create status = %d", resp.StatusCode)
+	}
+	friends, err := e.store.ListFriendLinks(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var created *model.FriendLink
+	for _, f := range friends {
+		if f.URL == "https://friend.example/" {
+			created = f
+		}
+	}
+	if created == nil || created.Name != "Test Friend" || !created.Visible {
+		t.Fatalf("created = %+v", created)
+	}
+
+	resp = e.postForm(t, "/admin/friends/update", url.Values{
+		"id":          {fmt.Sprint(created.ID)},
+		"name":        {"Renamed Friend"},
+		"url":         {created.URL},
+		"avatar":      {created.Avatar},
+		"description": {"renamed"},
+		"sort_order":  {"8"},
+	})
+	resp.Body.Close()
+	updated, err := e.store.GetFriendLink(created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Name != "Renamed Friend" || updated.Visible {
+		t.Fatalf("updated = %+v", updated)
+	}
+
+	resp = e.postForm(t, "/admin/friends/delete", url.Values{"id": {fmt.Sprint(created.ID)}})
+	resp.Body.Close()
+	if _, err := e.store.GetFriendLink(created.ID); err == nil {
+		t.Fatal("friend link was not deleted")
+	}
+}
+
 func TestSettingsSave(t *testing.T) {
 	e := newTestEnv(t)
 	e.setup(t)

@@ -18,6 +18,7 @@ type Deps struct {
 	CommentWrites store.CommentWriter
 	Notes         store.NoteReader
 	Options       store.OptionReader
+	Friends       store.FriendLinkReader
 	// Events receives domain events after successful writes. It defaults to a
 	// no-op emitter so tests and embedded uses can omit plugins.
 	Events events.Emitter
@@ -39,6 +40,7 @@ func NewDeps(db store.Store, emitters ...events.Emitter) Deps {
 		CommentWrites: db,
 		Notes:         db,
 		Options:       db,
+		Friends:       db,
 		Events:        emitter,
 	}
 }

@@ -666,3 +666,62 @@ func TestTagCountsOnlyPublishedPosts(t *testing.T) {
 		t.Fatalf("GetTag count = %d", got.PostCount)
 	}
 }
+
+func TestFriendLinks(t *testing.T) {
+	s := newTestStore(t)
+
+	links, err := s.ListFriendLinks(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(links) != 11 {
+		t.Fatalf("seeded links = %d", len(links))
+	}
+
+	link := &model.FriendLink{
+		Name: "Hidden", URL: "https://hidden.example/", Description: "hidden",
+		SortOrder: 0, Visible: false,
+	}
+	if err := s.CreateFriendLink(link); err != nil {
+		t.Fatal(err)
+	}
+	public, err := s.ListFriendLinks(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(public) != 11 {
+		t.Fatalf("hidden link leaked: %d", len(public))
+	}
+	all, err := s.ListFriendLinks(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 12 {
+		t.Fatalf("admin links = %d", len(all))
+	}
+
+	link.Visible = true
+	link.Name = "Visible"
+	if err := s.UpdateFriendLink(link); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.GetFriendLink(link.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Visible || got.Name != "Visible" {
+		t.Fatalf("updated link = %+v", got)
+	}
+	if err := s.DeleteFriendLink(link.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.GetFriendLink(link.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("deleted link err = %v", err)
+	}
+
+	if err := s.CreateFriendLink(&model.FriendLink{
+		Name: "Duplicate", URL: links[0].URL, Visible: true,
+	}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("duplicate URL err = %v", err)
+	}
+}
