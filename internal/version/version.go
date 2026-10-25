@@ -6,7 +6,7 @@ import "strings"
 
 var (
 	// Version is the semantic version without a leading "v" (for example 0.1.0).
-	Version = "0.1.0"
+	Version = "0.1.1"
 	// Commit is the short source revision.
 	Commit = "dev"
 	// BuildDate is the UTC build timestamp.
