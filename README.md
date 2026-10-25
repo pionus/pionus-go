@@ -95,7 +95,7 @@ make docker
 ```
 
 The project and the arry framework are developed together via `go.work`; see
-`go.work.example` and `CLAUDE.md`.
+`go.work.example`.
 
 ## Status
 
