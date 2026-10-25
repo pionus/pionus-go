@@ -123,6 +123,14 @@ func Import(reader io.Reader, opts Options) (*Report, error) {
 		return nil, err
 	}
 
+	if len(im.ex.Fields) > 0 {
+		im.report.Warnings = append(im.report.Warnings,
+			fmt.Sprintf("%d Typecho custom fields were exported but are not mapped to Pionus", len(im.ex.Fields)))
+	}
+	if im.ex.Site.Theme != "" {
+		im.report.Warnings = append(im.report.Warnings,
+			fmt.Sprintf("Typecho theme %q is not portable; provide a Pionus theme via the theme setting", im.ex.Site.Theme))
+	}
 	if len(im.report.MissingUploads) > 0 {
 		im.report.Warnings = append(im.report.Warnings,
 			"some Typecho attachments are missing on disk; copy usr/uploads before running with -typecho-uploads")
