@@ -22,6 +22,8 @@ URLs are not preserved; imported content links are rewritten to the new routes.
   and user roles
 - Deployment manifests, backup script and CI
 - Trusted-proxy aware client IPs for rate limiting
+- Compile-time plugins with lifecycle hooks and a typed post/comment/note
+  event model (reference `eventlog` plugin included)
 - Admin UI at `/admin`: dashboard, Markdown editor with preview, media
   library, taxonomies, comments and settings
 - bcrypt login, server-side sessions, CSRF protection, upload MIME validation
@@ -106,5 +108,5 @@ RSS/sitemap, password-protected posts, signed draft previews, user management,
 FTS5 search, deployment/backup/CI assets and image audit.
 
 Design notes for the narrowed handler interfaces and inline math are in
-[docs/backlog.md](docs/backlog.md). The public handlers depend on small
-per-domain interfaces; the admin intentionally keeps the full store.
+[docs/backlog.md](docs/backlog.md). Plugin and event extension points are
+documented in [docs/plugins.md](docs/plugins.md).
