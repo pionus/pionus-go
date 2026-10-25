@@ -2,17 +2,18 @@
 
 A self-hosted blog engine in Go, built on [arry](../arry) and SQLite. It is a
 Go replacement for a Typecho blog: compatible content semantics, a built-in
-admin UI, and an importer for existing posts, pages and comments. Old Typecho
-URLs are not preserved; imported content links are rewritten to the new routes.
+admin UI, and an importer for existing posts, pages and comments. Imported
+content links are rewritten to new routes; old Typecho URLs can be 301
+redirected with the optional `typecho-redirects` plugin.
 
 ## Features
 
 - Posts and independent pages, drafts, private and scheduled publishing
 - Categories, tags, threaded comments with moderation
 - 微语 timeline for short posts, with a simple admin composer and permalinks
-- Paper & Ink public theme (embedded): archive, category/tag/date pages,
-  search, TOC, code copy, KaTeX display math plus opt-in inline `$...$`,
-  dark mode, broken-image placeholders
+- Paper & Ink public theme (embedded, with external theme overlay): archive,
+  category/tag/date pages, search, TOC, code copy, KaTeX display math plus
+  opt-in inline `$...$`, dark mode, broken-image placeholders
 - 传送门 friend-links page and 微语 timeline
 - Native threaded comments with moderation, CSRF, honeypot, rate limiting and
   HTML sanitizing
@@ -23,7 +24,11 @@ URLs are not preserved; imported content links are rewritten to the new routes.
 - Deployment manifests, backup script and CI
 - Trusted-proxy aware client IPs for rate limiting
 - Compile-time plugins with lifecycle hooks and a typed post/comment/note
-  event model (reference `eventlog` plugin included)
+  event model (`eventlog` reference plugin)
+- Admin Typecho import wizard plus CLI/ZIP bundle import
+- Optional `typecho-redirects` plugin for 301 legacy Typecho URLs
+- External theme overlay via `theme` / `PIONUS_THEME`; missing templates fall
+  back to the embedded theme
 - Admin UI at `/admin`: dashboard, Markdown editor with preview, media
   library, taxonomies, comments and settings
 - bcrypt login, server-side sessions, CSRF protection, upload MIME validation
@@ -34,6 +39,13 @@ URLs are not preserved; imported content links are rewritten to the new routes.
 ```bash
 cp config.yaml config.yaml.local    # optional
 make dev
+```
+
+Or run the packaged image:
+
+```bash
+cp .env.example .env
+docker compose up -d
 ```
 
 Open <http://localhost:8087/admin/setup> and create the first account, or
@@ -104,11 +116,15 @@ The project and the arry framework are developed together via `go.work`; see
 
 Implemented: content model, storage layer, public pages, Paper & Ink theme,
 native comments, JSON API, admin UI, authentication, uploads, Typecho import,
-RSS/sitemap, password-protected posts, signed draft previews, user management,
-FTS5 search, deployment/backup/CI assets and image audit.
+RSS/sitemap, password-protected posts and tags, signed draft previews, user
+management, FTS5 search, deployment/backup/CI assets and image audit.
 
-Hidden tag configuration and behavior are documented in
-[docs/tag-protection.md](docs/tag-protection.md). Design notes for the narrowed
-handler interfaces and inline math are in [docs/backlog.md](docs/backlog.md).
-Plugin and event extension points are documented in
-[docs/plugins.md](docs/plugins.md).
+Migration, hidden tags, external themes and plugin extension points are
+documented in:
+
+- [Install](docs/install.md)
+- [Typecho migration](docs/typecho-migration.md)
+- [Hidden tags](docs/tag-protection.md)
+- [External themes](docs/themes.md)
+- [Plugins and events](docs/plugins.md)
+- [Design notes](docs/backlog.md)

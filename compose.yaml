@@ -1,0 +1,27 @@
+services:
+  pionus:
+    image: ghcr.io/secbone/pionus:latest
+    container_name: pionus
+    restart: unless-stopped
+    ports:
+      - "8087:8087"
+    environment:
+      PIONUS_DB_PATH: /app/data/pionus.db
+      PIONUS_UPLOAD_DIR: /app/uploads
+      PIONUS_SECRET: ${PIONUS_SECRET:-}
+      PIONUS_AUTH_TOKEN: ${PIONUS_AUTH_TOKEN:-}
+      PIONUS_SESSION_SECURE: ${PIONUS_SESSION_SECURE:-}
+      PIONUS_TRUSTED_PROXIES: ${PIONUS_TRUSTED_PROXIES:-}
+      PIONUS_PLUGINS_ENABLED: ${PIONUS_PLUGINS_ENABLED:-}
+      PIONUS_THEME: ${PIONUS_THEME:-}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8087/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    stop_grace_period: 15s
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+      - ./themes:/app/themes:ro
+      - ./config.yaml:/app/config.yaml:ro

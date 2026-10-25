@@ -52,6 +52,31 @@ kubectl -n lnmp exec deploy/pionus -- ./pionus -config config.yaml \
 Then set `site.url` in `/admin/settings` to the production URL. Feeds,
 sitemap and canonical links use that value.
 
+## Themes and plugins
+
+The built-in theme is embedded, so no extra volume is required. To use an
+external theme, mount it into the pod and set:
+
+```yaml
+env:
+  - name: PIONUS_THEME
+    value: /app/themes/my-theme
+```
+
+Missing templates/assets fall back to the embedded theme.
+
+Compile-time plugins are enabled at runtime:
+
+```yaml
+env:
+  - name: PIONUS_PLUGINS_ENABLED
+    value: typecho-redirects,eventlog
+```
+
+The plugin code must already be present in the image. The optional
+`typecho-redirects` plugin provides 301 redirects for common legacy Typecho
+URLs after an import.
+
 ## Backups
 
 `scripts/backup.sh` uses SQLite's online backup and archives uploads:
