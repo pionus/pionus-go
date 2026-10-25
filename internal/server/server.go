@@ -54,6 +54,9 @@ func New(cfg *config.Config, db store.Store) (*arry.Arry, error) {
 	postGuard := handler.NewPostGuard(secret, cfg.Session.Secure)
 
 	app := arry.New()
+	if err := app.SetTrustedProxies(cfg.Server.TrustedProxies); err != nil {
+		return nil, err
+	}
 	app.Use(middlewares.CORS())
 	app.Use(middlewares.Gzip)
 	if cfg.Server.AccessLog == "" || cfg.Server.AccessLog == "-" {

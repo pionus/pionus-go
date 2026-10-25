@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -13,6 +14,8 @@ type ServerConfig struct {
 	Addr string `yaml:"addr"`
 	// AccessLog is the request log path. Empty or "-" logs to stdout.
 	AccessLog string `yaml:"access_log"`
+	// TrustedProxies lists proxy CIDRs/IPs whose forwarded headers are trusted.
+	TrustedProxies []string `yaml:"trusted_proxies"`
 }
 
 type DatabaseConfig struct {
@@ -78,6 +81,13 @@ func Load(path string) (*Config, error) {
 	}
 	if v, ok := os.LookupEnv("PIONUS_ACCESS_LOG"); ok {
 		cfg.Server.AccessLog = v
+	}
+	if v := os.Getenv("PIONUS_TRUSTED_PROXIES"); v != "" {
+		for _, part := range strings.Split(v, ",") {
+			if part = strings.TrimSpace(part); part != "" {
+				cfg.Server.TrustedProxies = append(cfg.Server.TrustedProxies, part)
+			}
+		}
 	}
 	if v := os.Getenv("PIONUS_SECRET"); v != "" {
 		cfg.Security.Secret = v

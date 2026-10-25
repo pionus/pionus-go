@@ -49,6 +49,8 @@ spec:
               value: /app/data/uploads
             - name: PIONUS_ACCESS_LOG
               value: "-"
+            - name: PIONUS_TRUSTED_PROXIES
+              value: "10.42.0.0/16"
             - name: PIONUS_TIMEZONE
               value: Asia/Shanghai
             - name: PIONUS_SESSION_SECURE

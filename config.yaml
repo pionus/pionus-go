@@ -1,6 +1,8 @@
 server:
   addr: ":8087"
   access_log: "logs/access.log"
+  # Only trust X-Forwarded-For/X-Real-IP from these proxies.
+  trusted_proxies: []
 
 timezone: "Asia/Shanghai"
 

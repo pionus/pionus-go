@@ -20,6 +20,8 @@ github.com/pionus/arry v0.0.0-20261024115432-a1c8a7182bc5 h1:PZebWqGYxy/l0Vf5fh/
 github.com/pionus/arry v0.0.0-20261024115432-a1c8a7182bc5/go.mod h1:TheKI8ku79ATiyPWid5CHWX47UnNBjSqHAxJo86V6AA=
 github.com/pionus/arry v0.0.0-20261024171122-52ca540d5ebc h1:WzOCDOzbqdsoHhrjQhyPThJnJz7nkPpmI3MiYtiNzZo=
 github.com/pionus/arry v0.0.0-20261024171122-52ca540d5ebc/go.mod h1:TheKI8ku79ATiyPWid5CHWX47UnNBjSqHAxJo86V6AA=
+github.com/pionus/arry v0.0.0-20261025003526-38a60dc19658 h1:DT4KTP/crwLPqSYOv9SM+hrnL6CZ67LUokUmJf/Q9N0=
+github.com/pionus/arry v0.0.0-20261025003526-38a60dc19658/go.mod h1:TheKI8ku79ATiyPWid5CHWX47UnNBjSqHAxJo86V6AA=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
 github.com/yuin/goldmark v1.7.16 h1:n+CJdUxaFMiDUNnWC3dMWCIQJSkxH4uz3ZwQBkAlVNE=

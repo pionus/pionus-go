@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/microcosm-cc/bluemonday v1.0.27
-	github.com/pionus/arry v0.0.0-20261024171122-52ca540d5ebc
+	github.com/pionus/arry v0.0.0-20261025003526-38a60dc19658
 	github.com/yuin/goldmark v1.7.16
 	golang.org/x/crypto v0.45.0
 	golang.org/x/net v0.47.0
