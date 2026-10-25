@@ -160,9 +160,9 @@ Admin extensions will be a separate phase.
 plugins:
   enabled:
     - eventlog
-  config:
-    eventlog:
-      level: "info"
+  # Optional plugin-specific settings:
+  # config:
+  #   eventlog: {}
 ```
 
 Environment override:

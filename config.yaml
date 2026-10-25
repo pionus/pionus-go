@@ -12,9 +12,7 @@ security:
 # Compile-time plugins. Built-in plugins are registered in plugins/plugins.go.
 plugins:
   enabled: []
-  # config:
-  #   eventlog:
-  #     level: "info"
+  # config: {}
 
 database:
   path: "./data/pionus.db"
