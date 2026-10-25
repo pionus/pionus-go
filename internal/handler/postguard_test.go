@@ -3,7 +3,9 @@ package handler
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
+	"time"
 
 	"github.com/pionus/arry"
 	"github.com/pionus/pionus-go/internal/model"
@@ -36,5 +38,30 @@ func TestPostGuard(t *testing.T) {
 	changed := &model.Post{ID: 7, PostPassword: "different"}
 	if guard.Allowed(ctx2, changed) {
 		t.Fatal("cookie should not unlock a post with a different password")
+	}
+}
+
+func TestPreviewToken(t *testing.T) {
+	guard := NewPostGuard("secret", false)
+	post := &model.Post{ID: 9, Slug: "draft", UpdatedAt: time.Now()}
+	token := guard.PreviewToken(post, time.Hour)
+
+	req := httptest.NewRequest(http.MethodGet, "/article/draft?preview="+url.QueryEscape(token), nil)
+	ctx := arry.NewContext(req, httptest.NewRecorder())
+	if !guard.ValidPreview(ctx, post) {
+		t.Fatal("valid preview token rejected")
+	}
+
+	changed := *post
+	changed.UpdatedAt = post.UpdatedAt.Add(time.Second)
+	if guard.ValidPreview(ctx, &changed) {
+		t.Fatal("preview token should be invalid after an edit")
+	}
+
+	expired := guard.PreviewToken(post, -time.Hour)
+	req = httptest.NewRequest(http.MethodGet, "/article/draft?preview="+url.QueryEscape(expired), nil)
+	ctx = arry.NewContext(req, httptest.NewRecorder())
+	if guard.ValidPreview(ctx, post) {
+		t.Fatal("expired preview token accepted")
 	}
 }

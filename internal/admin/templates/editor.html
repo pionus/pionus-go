@@ -5,6 +5,7 @@
   <h1>{{if .IsNew}}写文章{{else}}编辑文章{{end}}</h1>
   <div class="actions">
     {{if not .IsNew}}<a href="/admin/posts">返回列表</a>{{end}}
+    {{if .PreviewURL}}<a href="{{.PreviewURL}}" target="_blank" rel="noopener">预览</a>{{end}}
     {{if and (not .IsNew) (eq .Post.Status "publish")}}<a href="/article/{{.Post.Slug}}" target="_blank" rel="noopener">查看页面</a>{{end}}
   </div>
 </div>

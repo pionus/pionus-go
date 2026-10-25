@@ -614,3 +614,9 @@ main.wrap { flex: 1 0 auto; padding-block: 44px 72px; }
   border: 1px solid var(--accent); background: var(--accent); color: #fff;
   padding: 8px 16px; border-radius: 7px; cursor: pointer;
 }
+
+.preview-banner {
+  max-width: var(--reading); margin: -10px 0 24px; padding: 10px 14px;
+  border: 1px dashed var(--accent); border-radius: 8px;
+  color: var(--accent); background: var(--accent-soft); font-size: 13px;
+}

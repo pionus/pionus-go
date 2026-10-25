@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -213,6 +214,10 @@ func (a *Admin) renderEditor(ctx arry.Context, code int, p *model.Post, isNew bo
 	data["SelectedCategoryIDs"] = selectedCatIDs
 	data["TagsValue"] = tagsValue
 	data["Error"] = errMsg
+	if p.ID != 0 && a.previewGuard != nil {
+		token := a.previewGuard.PreviewToken(p, 7*24*time.Hour)
+		data["PreviewURL"] = "/article/" + p.Slug + "?preview=" + url.QueryEscape(token)
+	}
 	a.render(ctx, code, "editor.html", data)
 }
 

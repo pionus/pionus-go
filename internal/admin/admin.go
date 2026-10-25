@@ -14,6 +14,7 @@ import (
 	"github.com/pionus/arry/middlewares"
 	"github.com/pionus/pionus-go/internal/auth"
 	"github.com/pionus/pionus-go/internal/content"
+	"github.com/pionus/pionus-go/internal/handler"
 	"github.com/pionus/pionus-go/internal/model"
 	"github.com/pionus/pionus-go/internal/store"
 )
@@ -25,18 +26,20 @@ var templateFS embed.FS
 type Options struct {
 	Store       store.Store
 	Auth        *auth.Manager
+	Preview     *handler.PostGuard
 	UploadDir   string
 	MaxUploadMB int
 }
 
 // Admin holds the admin UI dependencies and templates.
 type Admin struct {
-	store       store.Store
-	auth        *auth.Manager
-	engine      arry.Engine
-	uploadDir   string
-	maxUpload   int64
-	loginLimits *loginLimiter
+	store        store.Store
+	auth         *auth.Manager
+	previewGuard *handler.PostGuard
+	engine       arry.Engine
+	uploadDir    string
+	maxUpload    int64
+	loginLimits  *loginLimiter
 }
 
 // New creates the admin area.
@@ -47,11 +50,12 @@ func New(opts Options) *Admin {
 	}
 
 	a := &Admin{
-		store:       opts.Store,
-		auth:        opts.Auth,
-		uploadDir:   opts.UploadDir,
-		maxUpload:   int64(maxMB) << 20,
-		loginLimits: newLoginLimiter(5, 15*time.Minute),
+		store:        opts.Store,
+		auth:         opts.Auth,
+		previewGuard: opts.Preview,
+		uploadDir:    opts.UploadDir,
+		maxUpload:    int64(maxMB) << 20,
+		loginLimits:  newLoginLimiter(5, 15*time.Minute),
 	}
 	a.engine = arry.NewEngineWithConfig(arry.EngineConfig{
 		Type:      arry.EngineHTML,

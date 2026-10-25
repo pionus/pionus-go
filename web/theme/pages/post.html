@@ -3,7 +3,8 @@
 {{define "content"}}
 <article class="post">
   <header class="post-head">
-    {{if .Post.Categories}}
+    {{if .Preview}}<div class="preview-banner">预览模式 · 这个页面尚未公开</div>{{end}}
+  {{if .Post.Categories}}
     <div class="cats">
       {{range .Post.Categories}}<a href="/category/{{.Slug}}">{{.Name}}</a>{{end}}
     </div>

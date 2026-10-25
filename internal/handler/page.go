@@ -293,11 +293,13 @@ func renderArticle(ctx arry.Context, db store.Store, guard *PostGuard, slug, err
 		return
 	}
 
-	if !post.PubliclyVisible(time.Now()) && !ctx.IsAuthed() {
+	now := time.Now()
+	preview := guard.ValidPreview(ctx, post)
+	if !post.PubliclyVisible(now) && !ctx.IsAuthed() && !preview {
 		notFound(ctx, db, "文章不存在")
 		return
 	}
-	if post.IsLocked() && !ctx.IsAuthed() && !guard.Allowed(ctx, post) {
+	if post.IsLocked() && !ctx.IsAuthed() && !preview && !guard.Allowed(ctx, post) {
 		renderPassword(ctx, db, post, "", http.StatusOK)
 		return
 	}
@@ -348,7 +350,7 @@ func renderArticle(ctx arry.Context, db store.Store, guard *PostGuard, slug, err
 
 	_ = db.IncrementPostViews(slug)
 
-	canComment := post.AllowComment && commentsEnabled(db)
+	canComment := post.AllowComment && commentsEnabled(db) && post.PubliclyVisible(now) && !preview
 	if form == nil {
 		form = &commentForm{
 			Started: time.Now().Unix(),
@@ -378,6 +380,10 @@ func renderArticle(ctx arry.Context, db store.Store, guard *PostGuard, slug, err
 	data["CommentMessage"] = commentMessage(ctx.Query("comment"))
 	data["Form"] = form
 	data["IsPage"] = post.Type == model.PostTypePage
+	data["Preview"] = preview
+	if preview {
+		data["NoIndex"] = true
+	}
 
 	ctx.Render(http.StatusOK, "post.html", data)
 }

@@ -157,6 +157,7 @@ func New(cfg *config.Config, db store.Store) (*arry.Arry, error) {
 	adminArea := admin.New(admin.Options{
 		Store:       db,
 		Auth:        session,
+		Preview:     postGuard,
 		UploadDir:   cfg.Upload.Dir,
 		MaxUploadMB: cfg.Upload.MaxSizeMB,
 	})
