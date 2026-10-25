@@ -166,6 +166,18 @@ func TestInlineMathInHTMLContent(t *testing.T) {
 	}
 }
 
+func TestInlineMathInMarkdownRawHTML(t *testing.T) {
+	p := &model.Post{
+		Format:  model.FormatMarkdown,
+		Content: "<div>Formula $x^2$</div>",
+		Math:    true,
+	}
+	got := RenderPost(p)
+	if !strings.Contains(string(got.HTML), `\(x^2\)`) {
+		t.Fatalf("raw HTML inline math was not converted: %s", got.HTML)
+	}
+}
+
 func TestRenderHTMLHeadingIDsUnique(t *testing.T) {
 	p := &model.Post{
 		Format:  model.FormatHTML,

@@ -115,7 +115,7 @@ func RenderPost(p *model.Post) RenderedPost {
 		}
 	}
 
-	normalized, toc := normalizeContent(raw, p.Math && p.Format == model.FormatHTML)
+	normalized, toc := normalizeContent(raw, p.Math)
 	return RenderedPost{
 		HTML:       template.HTML(normalized),
 		TOC:        toc,
