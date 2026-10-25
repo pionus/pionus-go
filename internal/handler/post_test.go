@@ -28,12 +28,13 @@ func newTestHandlers(t *testing.T) (*arry.Arry, store.Store) {
 	app.Use(middlewares.Auth("secret", http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete))
 
 	guard := NewPostGuard("test-secret", false)
+	deps := NewDeps(db)
 	r := app.Router()
-	r.Get("/api/posts", ListPosts(db))
-	r.Get("/api/posts/:slug", GetPost(db, guard))
-	r.Post("/api/posts", CreatePost(db))
-	r.Put("/api/posts/:slug", UpdatePost(db))
-	r.Delete("/api/posts/:slug", DeletePost(db))
+	r.Get("/api/posts", ListPosts(deps))
+	r.Get("/api/posts/:slug", GetPost(deps, guard))
+	r.Post("/api/posts", CreatePost(deps))
+	r.Put("/api/posts/:slug", UpdatePost(deps))
+	r.Delete("/api/posts/:slug", DeletePost(deps))
 
 	return app, db
 }

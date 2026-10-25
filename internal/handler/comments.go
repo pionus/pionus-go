@@ -129,14 +129,14 @@ func csrfToken(ctx arry.Context) string {
 	return middlewares.CSRFToken(ctx)
 }
 
-func PostComment(db store.Store, guard *PostGuard) arry.Handler {
+func PostComment(deps Deps, guard *PostGuard) arry.Handler {
 	return func(ctx arry.Context) {
 		slug := ctx.Param("slug")
 
-		post, err := db.GetPost(slug)
+		post, err := deps.Posts.GetPost(slug)
 		if err != nil {
 			if errors.Is(err, store.ErrNotFound) {
-				notFound(ctx, db, "文章不存在")
+				notFound(ctx, deps, "文章不存在")
 				return
 			}
 			slog.Error("comment: load post", "slug", slug, "err", err)
@@ -144,14 +144,14 @@ func PostComment(db store.Store, guard *PostGuard) arry.Handler {
 			return
 		}
 		if !post.PubliclyVisible(time.Now()) {
-			notFound(ctx, db, "文章不存在")
+			notFound(ctx, deps, "文章不存在")
 			return
 		}
 		if post.IsLocked() && !ctx.IsAuthed() && !guard.Allowed(ctx, post) {
 			ctx.Reply(http.StatusForbidden)
 			return
 		}
-		if !post.AllowComment || !commentsEnabled(db) {
+		if !post.AllowComment || !commentsEnabled(deps) {
 			ctx.Reply(http.StatusForbidden)
 			return
 		}
@@ -159,7 +159,7 @@ func PostComment(db store.Store, guard *PostGuard) arry.Handler {
 		r := ctx.Request()
 		if err := r.ParseForm(); err != nil {
 			slog.Warn("comment parse form", "err", err)
-			renderArticle(ctx, db, guard, slug, "表单内容无法解析。", nil)
+			renderArticle(ctx, deps, guard, slug, "表单内容无法解析。", nil)
 			return
 		}
 
@@ -180,19 +180,19 @@ func PostComment(db store.Store, guard *PostGuard) arry.Handler {
 
 		now := time.Now().Unix()
 		if form.Started == 0 || now-form.Started < 2 || now-form.Started > 2*60*60 {
-			renderArticle(ctx, db, guard, slug, "提交过快或页面已过期，请重新提交。", form)
+			renderArticle(ctx, deps, guard, slug, "提交过快或页面已过期，请重新提交。", form)
 			return
 		}
 		if form.Author == "" || utf8.RuneCountInString(form.Author) > 50 {
-			renderArticle(ctx, db, guard, slug, "昵称不能为空且不能超过 50 个字符。", form)
+			renderArticle(ctx, deps, guard, slug, "昵称不能为空且不能超过 50 个字符。", form)
 			return
 		}
 		if form.Content == "" || utf8.RuneCountInString(form.Content) > 5000 {
-			renderArticle(ctx, db, guard, slug, "评论内容不能为空且不能超过 5000 个字符。", form)
+			renderArticle(ctx, deps, guard, slug, "评论内容不能为空且不能超过 5000 个字符。", form)
 			return
 		}
 		if form.Email != "" && !validCommentEmail(form.Email) {
-			renderArticle(ctx, db, guard, slug, "邮箱格式不正确。", form)
+			renderArticle(ctx, deps, guard, slug, "邮箱格式不正确。", form)
 			return
 		}
 		if form.URL != "" && !strings.HasPrefix(form.URL, "http://") && !strings.HasPrefix(form.URL, "https://") {
@@ -201,7 +201,7 @@ func PostComment(db store.Store, guard *PostGuard) arry.Handler {
 
 		var parentID *int64
 		if form.Parent > 0 {
-			parent, err := db.GetComment(form.Parent)
+			parent, err := deps.Comments.GetComment(form.Parent)
 			if err == nil && parent.PostID == post.ID && parent.Status == model.CommentApproved {
 				id := parent.ID
 				parentID = &id
@@ -209,13 +209,13 @@ func PostComment(db store.Store, guard *PostGuard) arry.Handler {
 		}
 
 		status := model.CommentApproved
-		if moderationRequired(db) {
+		if moderationRequired(deps) {
 			status = model.CommentPending
 		}
 
 		ip := ctx.ClientIP()
 		if !commentLimits.Allow(ip) || !commentGlobalLimits.Allow("global") {
-			renderArticle(ctx, db, guard, slug, "评论太频繁，请稍后再试。", form)
+			renderArticle(ctx, deps, guard, slug, "评论太频繁，请稍后再试。", form)
 			return
 		}
 		commentLimits.Record(ip)
@@ -233,9 +233,9 @@ func PostComment(db store.Store, guard *PostGuard) arry.Handler {
 			UserAgent: r.UserAgent(),
 			CreatedAt: time.Now(),
 		}
-		if err := db.CreateComment(comment); err != nil {
+		if err := deps.CommentWrites.CreateComment(comment); err != nil {
 			slog.Error("create comment", "post", post.ID, "err", err)
-			renderArticle(ctx, db, guard, slug, "评论保存失败，请稍后再试。", form)
+			renderArticle(ctx, deps, guard, slug, "评论保存失败，请稍后再试。", form)
 			return
 		}
 
@@ -247,8 +247,8 @@ func PostComment(db store.Store, guard *PostGuard) arry.Handler {
 	}
 }
 
-func moderationRequired(db store.Store) bool {
-	v, err := db.GetOption("comments.moderation")
+func moderationRequired(deps Deps) bool {
+	v, err := deps.Options.GetOption("comments.moderation")
 	if err != nil {
 		return true
 	}

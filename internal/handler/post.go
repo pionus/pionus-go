@@ -41,7 +41,7 @@ func pageParams(ctx arry.Context, defaultLimit int) (page, limit int) {
 	return page, limit
 }
 
-func ListPosts(db store.Store) arry.Handler {
+func ListPosts(deps Deps) arry.Handler {
 	return func(ctx arry.Context) {
 		page, limit := pageParams(ctx, 20)
 		now := time.Now()
@@ -57,7 +57,7 @@ func ListPosts(db store.Store) arry.Handler {
 			TagSlug:         ctx.Query("tag"),
 		}
 
-		posts, total, err := db.ListPosts(f)
+		posts, total, err := deps.Posts.ListPosts(f)
 		if err != nil {
 			slog.Error("list posts", "err", err)
 			jsonError(ctx, http.StatusInternalServerError, "failed to list posts")
@@ -73,11 +73,11 @@ func ListPosts(db store.Store) arry.Handler {
 	}
 }
 
-func GetPost(db store.Store, guard *PostGuard) arry.Handler {
+func GetPost(deps Deps, guard *PostGuard) arry.Handler {
 	return func(ctx arry.Context) {
 		slug := ctx.Param("slug")
 
-		p, err := db.GetPost(slug)
+		p, err := deps.Posts.GetPost(slug)
 		if err != nil {
 			if errors.Is(err, store.ErrNotFound) {
 				jsonError(ctx, http.StatusNotFound, "post not found")
@@ -101,7 +101,7 @@ func GetPost(db store.Store, guard *PostGuard) arry.Handler {
 	}
 }
 
-func CreatePost(db store.Store) arry.Handler {
+func CreatePost(deps Deps) arry.Handler {
 	return func(ctx arry.Context) {
 		if !ctx.IsAuthed() {
 			jsonError(ctx, http.StatusForbidden, "forbidden")
@@ -120,7 +120,7 @@ func CreatePost(db store.Store) arry.Handler {
 			return
 		}
 
-		if err := db.CreatePost(p); err != nil {
+		if err := deps.PostWrites.CreatePost(p); err != nil {
 			if errors.Is(err, store.ErrConflict) {
 				jsonError(ctx, http.StatusConflict, "slug already exists")
 				return
@@ -130,7 +130,7 @@ func CreatePost(db store.Store) arry.Handler {
 			return
 		}
 
-		created, err := db.GetPost(p.Slug)
+		created, err := deps.Posts.GetPost(p.Slug)
 		if err != nil {
 			created = p
 		}
@@ -138,7 +138,7 @@ func CreatePost(db store.Store) arry.Handler {
 	}
 }
 
-func UpdatePost(db store.Store) arry.Handler {
+func UpdatePost(deps Deps) arry.Handler {
 	return func(ctx arry.Context) {
 		if !ctx.IsAuthed() {
 			jsonError(ctx, http.StatusForbidden, "forbidden")
@@ -147,7 +147,7 @@ func UpdatePost(db store.Store) arry.Handler {
 
 		slug := ctx.Param("slug")
 
-		existing, err := db.GetPost(slug)
+		existing, err := deps.Posts.GetPost(slug)
 		if err != nil {
 			if errors.Is(err, store.ErrNotFound) {
 				jsonError(ctx, http.StatusNotFound, "post not found")
@@ -170,7 +170,7 @@ func UpdatePost(db store.Store) arry.Handler {
 			return
 		}
 
-		if err := db.UpdatePost(slug, p); err != nil {
+		if err := deps.PostWrites.UpdatePost(slug, p); err != nil {
 			if errors.Is(err, store.ErrNotFound) {
 				jsonError(ctx, http.StatusNotFound, "post not found")
 				return
@@ -184,7 +184,7 @@ func UpdatePost(db store.Store) arry.Handler {
 			return
 		}
 
-		updated, err := db.GetPost(slug)
+		updated, err := deps.Posts.GetPost(slug)
 		if err != nil {
 			updated = p
 		}
@@ -192,7 +192,7 @@ func UpdatePost(db store.Store) arry.Handler {
 	}
 }
 
-func DeletePost(db store.Store) arry.Handler {
+func DeletePost(deps Deps) arry.Handler {
 	return func(ctx arry.Context) {
 		if !ctx.IsAuthed() {
 			jsonError(ctx, http.StatusForbidden, "forbidden")
@@ -200,7 +200,7 @@ func DeletePost(db store.Store) arry.Handler {
 		}
 
 		slug := ctx.Param("slug")
-		if err := db.DeletePost(slug); err != nil {
+		if err := deps.PostWrites.DeletePost(slug); err != nil {
 			if errors.Is(err, store.ErrNotFound) {
 				jsonError(ctx, http.StatusNotFound, "post not found")
 				return

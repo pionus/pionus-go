@@ -23,10 +23,10 @@ type YearGroup struct {
 	Posts []*model.Post
 }
 
-func Index(db store.Store) arry.Handler {
+func Index(deps Deps) arry.Handler {
 	return func(ctx arry.Context) {
 		now := time.Now()
-		posts, _, err := db.ListPosts(store.PostFilter{
+		posts, _, err := deps.Posts.ListPosts(store.PostFilter{
 			Type:            model.PostTypePost,
 			Statuses:        []string{model.StatusPublish},
 			PublishedBefore: &now,
@@ -38,8 +38,8 @@ func Index(db store.Store) arry.Handler {
 			slog.Error("index page", "err", err)
 		}
 
-		categories, _ := db.ListCategories()
-		tags, _ := db.ListTags()
+		categories, _ := deps.Taxonomy.ListCategories()
+		tags, _ := deps.Taxonomy.ListTags()
 		sort.Slice(tags, func(i, j int) bool {
 			if tags[i].PostCount != tags[j].PostCount {
 				return tags[i].PostCount > tags[j].PostCount
@@ -50,7 +50,7 @@ func Index(db store.Store) arry.Handler {
 			tags = tags[:24]
 		}
 
-		data := baseData(ctx, db, "")
+		data := baseData(ctx, deps, "")
 		data["Posts"] = posts
 		data["Categories"] = categories
 		data["Tags"] = tags
@@ -58,11 +58,11 @@ func Index(db store.Store) arry.Handler {
 	}
 }
 
-func ArticleList(db store.Store) arry.Handler {
+func ArticleList(deps Deps) arry.Handler {
 	return func(ctx arry.Context) {
-		data, err := listData(ctx, db, store.PostFilter{
+		data, err := listData(ctx, deps, store.PostFilter{
 			Page:  parsePage(ctx),
-			Limit: perPage(db, 20),
+			Limit: perPage(deps, 20),
 		}, "文章归档", "/article", nil, true)
 		if err != nil {
 			slog.Error("article list page", "err", err)
@@ -75,24 +75,24 @@ func ArticleList(db store.Store) arry.Handler {
 	}
 }
 
-func ArticleDetail(db store.Store, guard *PostGuard) arry.Handler {
+func ArticleDetail(deps Deps, guard *PostGuard) arry.Handler {
 	return func(ctx arry.Context) {
-		renderArticle(ctx, db, guard, ctx.Param("slug"), "", nil)
+		renderArticle(ctx, deps, guard, ctx.Param("slug"), "", nil)
 	}
 }
 
-func CategoryArchive(db store.Store) arry.Handler {
+func CategoryArchive(deps Deps) arry.Handler {
 	return func(ctx arry.Context) {
 		slug := ctx.Param("slug")
-		c, err := db.GetCategory(slug)
+		c, err := deps.Taxonomy.GetCategory(slug)
 		if err != nil {
-			notFound(ctx, db, "分类不存在")
+			notFound(ctx, deps, "分类不存在")
 			return
 		}
 
-		data, err := listData(ctx, db, store.PostFilter{
+		data, err := listData(ctx, deps, store.PostFilter{
 			Page:         parsePage(ctx),
-			Limit:        perPage(db, 20),
+			Limit:        perPage(deps, 20),
 			CategorySlug: slug,
 		}, "分类："+c.Name, "/category/"+slug, nil, false)
 		if err != nil {
@@ -108,18 +108,18 @@ func CategoryArchive(db store.Store) arry.Handler {
 	}
 }
 
-func TagArchive(db store.Store) arry.Handler {
+func TagArchive(deps Deps) arry.Handler {
 	return func(ctx arry.Context) {
 		slug := ctx.Param("slug")
-		t, err := db.GetTag(slug)
+		t, err := deps.Taxonomy.GetTag(slug)
 		if err != nil {
-			notFound(ctx, db, "标签不存在")
+			notFound(ctx, deps, "标签不存在")
 			return
 		}
 
-		data, err := listData(ctx, db, store.PostFilter{
+		data, err := listData(ctx, deps, store.PostFilter{
 			Page:    parsePage(ctx),
-			Limit:   perPage(db, 20),
+			Limit:   perPage(deps, 20),
 			TagSlug: slug,
 		}, "标签："+t.Name, "/tag/"+slug, nil, false)
 		if err != nil {
@@ -135,11 +135,11 @@ func TagArchive(db store.Store) arry.Handler {
 	}
 }
 
-func DateArchive(db store.Store) arry.Handler {
+func DateArchive(deps Deps) arry.Handler {
 	return func(ctx arry.Context) {
 		year, err := strconv.Atoi(ctx.Param("year"))
 		if err != nil || year < 1970 || year > 9999 {
-			notFound(ctx, db, "日期不正确")
+			notFound(ctx, deps, "日期不正确")
 			return
 		}
 
@@ -147,7 +147,7 @@ func DateArchive(db store.Store) arry.Handler {
 		if raw := ctx.Param("month"); raw != "" {
 			month, err = strconv.Atoi(raw)
 			if err != nil || month < 1 || month > 12 {
-				notFound(ctx, db, "日期不正确")
+				notFound(ctx, deps, "日期不正确")
 				return
 			}
 		}
@@ -155,7 +155,7 @@ func DateArchive(db store.Store) arry.Handler {
 		if raw := ctx.Param("day"); raw != "" {
 			day, err = strconv.Atoi(raw)
 			if err != nil || day < 1 || day > 31 {
-				notFound(ctx, db, "日期不正确")
+				notFound(ctx, deps, "日期不正确")
 				return
 			}
 		}
@@ -178,9 +178,9 @@ func DateArchive(db store.Store) arry.Handler {
 			base = from.Format("/archives/2006")
 		}
 
-		data, err := listData(ctx, db, store.PostFilter{
+		data, err := listData(ctx, deps, store.PostFilter{
 			Page:          parsePage(ctx),
-			Limit:         perPage(db, 20),
+			Limit:         perPage(deps, 20),
 			PublishedFrom: &from,
 			PublishedTo:   &to,
 		}, title, base, nil, false)
@@ -195,7 +195,7 @@ func DateArchive(db store.Store) arry.Handler {
 	}
 }
 
-func Search(db store.Store) arry.Handler {
+func Search(deps Deps) arry.Handler {
 	return func(ctx arry.Context) {
 		query := strings.TrimSpace(ctx.Query("q"))
 		extra := url.Values{}
@@ -211,7 +211,7 @@ func Search(db store.Store) arry.Handler {
 		var data map[string]any
 		var err error
 		if query == "" {
-			data = baseData(ctx, db, title)
+			data = baseData(ctx, deps, title)
 			data["Posts"] = []*model.Post{}
 			data["Total"] = 0
 			data["Page"] = 1
@@ -221,9 +221,9 @@ func Search(db store.Store) arry.Handler {
 			data["SearchQuery"] = ""
 			data["NoIndex"] = true
 		} else {
-			data, err = listData(ctx, db, store.PostFilter{
+			data, err = listData(ctx, deps, store.PostFilter{
 				Page:  parsePage(ctx),
-				Limit: perPage(db, 20),
+				Limit: perPage(deps, 20),
 				Query: query,
 			}, title, "/search", extra, false)
 			if err != nil {
@@ -239,23 +239,23 @@ func Search(db store.Store) arry.Handler {
 	}
 }
 
-func CategoriesPage(db store.Store) arry.Handler {
+func CategoriesPage(deps Deps) arry.Handler {
 	return func(ctx arry.Context) {
-		categories, err := db.ListCategories()
+		categories, err := deps.Taxonomy.ListCategories()
 		if err != nil {
 			slog.Error("categories page", "err", err)
 			ctx.Reply(http.StatusInternalServerError)
 			return
 		}
-		data := baseData(ctx, db, "分类")
+		data := baseData(ctx, deps, "分类")
 		data["Categories"] = categories
 		ctx.Render(http.StatusOK, "categories.html", data)
 	}
 }
 
-func TagsPage(db store.Store) arry.Handler {
+func TagsPage(deps Deps) arry.Handler {
 	return func(ctx arry.Context) {
-		tags, err := db.ListTags()
+		tags, err := deps.Taxonomy.ListTags()
 		if err != nil {
 			slog.Error("tags page", "err", err)
 			ctx.Reply(http.StatusInternalServerError)
@@ -267,7 +267,7 @@ func TagsPage(db store.Store) arry.Handler {
 			}
 			return tags[i].Name < tags[j].Name
 		})
-		data := baseData(ctx, db, "标签")
+		data := baseData(ctx, deps, "标签")
 		data["Tags"] = tags
 		ctx.Render(http.StatusOK, "tags.html", data)
 	}
@@ -281,11 +281,11 @@ func max(a, b int) int {
 }
 
 // renderArticle loads a post, its comments and renders the detail page.
-func renderArticle(ctx arry.Context, db store.Store, guard *PostGuard, slug, errMsg string, form *commentForm) {
-	post, err := db.GetPost(slug)
+func renderArticle(ctx arry.Context, deps Deps, guard *PostGuard, slug, errMsg string, form *commentForm) {
+	post, err := deps.Posts.GetPost(slug)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			notFound(ctx, db, "文章不存在")
+			notFound(ctx, deps, "文章不存在")
 			return
 		}
 		slog.Error("article page", "slug", slug, "err", err)
@@ -296,11 +296,11 @@ func renderArticle(ctx arry.Context, db store.Store, guard *PostGuard, slug, err
 	now := time.Now()
 	preview := guard.ValidPreview(ctx, post)
 	if !post.PubliclyVisible(now) && !ctx.IsAuthed() && !preview {
-		notFound(ctx, db, "文章不存在")
+		notFound(ctx, deps, "文章不存在")
 		return
 	}
 	if post.IsLocked() && !ctx.IsAuthed() && !preview && !guard.Allowed(ctx, post) {
-		renderPassword(ctx, db, post, "", http.StatusOK)
+		renderPassword(ctx, deps, post, "", http.StatusOK)
 		return
 	}
 
@@ -311,12 +311,12 @@ func renderArticle(ctx arry.Context, db store.Store, guard *PostGuard, slug, err
 		readingTime = 1
 	}
 
-	prev, next, err := db.AdjacentPosts(slug)
+	prev, next, err := deps.Posts.AdjacentPosts(slug)
 	if err != nil {
 		slog.Warn("adjacent posts", "slug", slug, "err", err)
 	}
 
-	comments, _, err := db.ListComments(store.CommentFilter{
+	comments, _, err := deps.Comments.ListComments(store.CommentFilter{
 		PostID: post.ID,
 		Status: model.CommentApproved,
 		Page:   1,
@@ -348,17 +348,17 @@ func renderArticle(ctx arry.Context, db store.Store, guard *PostGuard, slug, err
 	}
 	pageRoots := roots[start:end]
 
-	_ = db.IncrementPostViews(slug)
+	_ = deps.Views.IncrementPostViews(slug)
 
-	canComment := post.AllowComment && commentsEnabled(db) && post.PubliclyVisible(now) && !preview
+	canComment := post.AllowComment && commentsEnabled(deps) && post.PubliclyVisible(now) && !preview
 	if form == nil {
 		form = &commentForm{
 			Started: time.Now().Unix(),
 		}
 	}
 
-	data := baseData(ctx, db, post.Title)
-	data["CanonicalURL"] = siteBaseURL(ctx, db) + "/article/" + post.Slug
+	data := baseData(ctx, deps, post.Title)
+	data["CanonicalURL"] = siteBaseURL(ctx, deps) + "/article/" + post.Slug
 	data["Post"] = post
 	data["Rendered"] = rendered
 	data["TOC"] = rendered.TOC
@@ -388,8 +388,8 @@ func renderArticle(ctx arry.Context, db store.Store, guard *PostGuard, slug, err
 	ctx.Render(http.StatusOK, "post.html", data)
 }
 
-func commentsEnabled(db store.Store) bool {
-	v, err := db.GetOption("comments.enabled")
+func commentsEnabled(deps Deps) bool {
+	v, err := deps.Options.GetOption("comments.enabled")
 	if err != nil {
 		return true
 	}

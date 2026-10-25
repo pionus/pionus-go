@@ -11,13 +11,13 @@ import (
 )
 
 // UnlockPost verifies a password-protected post and sets an access cookie.
-func UnlockPost(db store.Store, guard *PostGuard) arry.Handler {
+func UnlockPost(deps Deps, guard *PostGuard) arry.Handler {
 	return func(ctx arry.Context) {
 		slug := ctx.Param("slug")
-		post, err := db.GetPost(slug)
+		post, err := deps.Posts.GetPost(slug)
 		if err != nil {
 			if errors.Is(err, store.ErrNotFound) {
-				notFound(ctx, db, "文章不存在")
+				notFound(ctx, deps, "文章不存在")
 				return
 			}
 			ctx.Reply(http.StatusInternalServerError)
@@ -28,13 +28,13 @@ func UnlockPost(db store.Store, guard *PostGuard) arry.Handler {
 			return
 		}
 		if err := ctx.Request().ParseForm(); err != nil {
-			renderPassword(ctx, db, post, "表单无法解析。", http.StatusBadRequest)
+			renderPassword(ctx, deps, post, "表单无法解析。", http.StatusBadRequest)
 			return
 		}
 
 		password := ctx.Request().PostFormValue("password")
 		if subtle.ConstantTimeCompare([]byte(password), []byte(post.PostPassword)) != 1 {
-			renderPassword(ctx, db, post, "密码不正确。", http.StatusUnauthorized)
+			renderPassword(ctx, deps, post, "密码不正确。", http.StatusUnauthorized)
 			return
 		}
 
@@ -43,8 +43,8 @@ func UnlockPost(db store.Store, guard *PostGuard) arry.Handler {
 	}
 }
 
-func renderPassword(ctx arry.Context, db store.Store, post *model.Post, errMsg string, status int) {
-	data := baseData(ctx, db, post.Title)
+func renderPassword(ctx arry.Context, deps Deps, post *model.Post, errMsg string, status int) {
+	data := baseData(ctx, deps, post.Title)
 	data["Post"] = post
 	data["Error"] = errMsg
 	data["UnlockAction"] = "/article/" + post.Slug + "/unlock"

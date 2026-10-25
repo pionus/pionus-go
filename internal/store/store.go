@@ -54,31 +54,23 @@ type PostFilter struct {
 
 // PostStore manages posts and pages.
 type PostStore interface {
-	GetPost(slug string) (*model.Post, error)
+	PostReader
+	PostWriter
+	PostMetrics
 	GetPostByID(id int64) (*model.Post, error)
 	GetPostBySource(source, sourceID string) (*model.Post, error)
-	ListPosts(f PostFilter) ([]*model.Post, int, error)
-	// AdjacentPosts returns the newer (prev) and older (next) published posts.
-	AdjacentPosts(slug string) (prev, next *model.Post, err error)
-	CreatePost(p *model.Post) error
-	UpdatePost(slug string, p *model.Post) error
 	// UpdatePostContent rewrites the body without touching timestamps or
 	// relations. It is used by migration link repair.
 	UpdatePostContent(id int64, content, excerpt string) error
-	DeletePost(slug string) error
-	IncrementPostViews(slug string) error
 }
 
 // TaxonomyStore manages categories, tags and their post relations.
 type TaxonomyStore interface {
-	ListCategories() ([]*model.Category, error)
-	GetCategory(slug string) (*model.Category, error)
+	TaxonomyReader
 	CreateCategory(c *model.Category) error
 	UpdateCategory(slug string, c *model.Category) error
 	DeleteCategory(slug string) error
 
-	ListTags() ([]*model.Tag, error)
-	GetTag(slug string) (*model.Tag, error)
 	CreateTag(t *model.Tag) error
 	UpdateTag(slug string, t *model.Tag) error
 	DeleteTag(slug string) error
@@ -102,10 +94,9 @@ type CommentFilter struct {
 
 // CommentStore manages post comments.
 type CommentStore interface {
-	GetComment(id int64) (*model.Comment, error)
+	CommentReader
+	CommentWriter
 	GetCommentBySource(source, sourceID string) (*model.Comment, error)
-	ListComments(f CommentFilter) ([]*model.Comment, int, error)
-	CreateComment(c *model.Comment) error
 	UpdateCommentStatus(id int64, status string) error
 	// UpdateCommentContent rewrites a comment body for migration link repair.
 	UpdateCommentContent(id int64, content string) error
@@ -134,8 +125,7 @@ type UserStore interface {
 
 // NoteStore manages short posts shown in the 微语 timeline.
 type NoteStore interface {
-	ListNotes(f NoteFilter) ([]*model.Note, int, error)
-	GetNote(id int64) (*model.Note, error)
+	NoteReader
 	GetNoteBySource(source, sourceID string) (*model.Note, error)
 	CreateNote(n *model.Note) error
 	UpdateNote(id int64, content, status string) error
@@ -153,7 +143,7 @@ type MediaStore interface {
 
 // OptionStore stores site settings as key/value pairs.
 type OptionStore interface {
-	GetOption(name string) (string, error)
+	OptionReader
 	SetOption(name, value string) error
 	AllOptions() (map[string]string, error)
 }

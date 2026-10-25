@@ -22,9 +22,9 @@ type siteInfo struct {
 	Locale      string
 }
 
-func loadSite(db store.Store) siteInfo {
+func loadSite(deps Deps) siteInfo {
 	get := func(name, def string) string {
-		v, err := db.GetOption(name)
+		v, err := deps.Options.GetOption(name)
 		if err != nil || v == "" {
 			return def
 		}
@@ -41,13 +41,13 @@ func loadSite(db store.Store) siteInfo {
 }
 
 // baseData builds the data every public template needs.
-func baseData(ctx arry.Context, db store.Store, title string) map[string]any {
-	site := loadSite(db)
+func baseData(ctx arry.Context, deps Deps, title string) map[string]any {
+	site := loadSite(deps)
 	if title == "" {
 		title = site.Title
 	}
 
-	pages, _, _ := db.ListPosts(store.PostFilter{
+	pages, _, _ := deps.Posts.ListPosts(store.PostFilter{
 		Type:     model.PostTypePage,
 		Statuses: []string{model.StatusPublish},
 		Page:     1,
@@ -102,7 +102,7 @@ func pageURL(base string, page int, extra url.Values) string {
 }
 
 // listData runs a public post query and builds archive data.
-func listData(ctx arry.Context, db store.Store, f store.PostFilter, title, base string, extra url.Values, groupByYear bool) (map[string]any, error) {
+func listData(ctx arry.Context, deps Deps, f store.PostFilter, title, base string, extra url.Values, groupByYear bool) (map[string]any, error) {
 	if f.Page < 1 {
 		f.Page = 1
 	}
@@ -119,7 +119,7 @@ func listData(ctx arry.Context, db store.Store, f store.PostFilter, title, base 
 	}
 	f.WithTaxonomy = true
 
-	posts, total, err := db.ListPosts(f)
+	posts, total, err := deps.Posts.ListPosts(f)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func listData(ctx arry.Context, db store.Store, f store.PostFilter, title, base 
 		totalPages = 1
 	}
 
-	data := baseData(ctx, db, title)
+	data := baseData(ctx, deps, title)
 	data["Posts"] = posts
 	data["Total"] = total
 	data["Page"] = f.Page
@@ -167,8 +167,8 @@ func parsePage(ctx arry.Context) int {
 	return page
 }
 
-func perPage(db store.Store, def int) int {
-	raw, err := db.GetOption("posts.per_page")
+func perPage(deps Deps, def int) int {
+	raw, err := deps.Options.GetOption("posts.per_page")
 	if err != nil {
 		return def
 	}
@@ -179,8 +179,8 @@ func perPage(db store.Store, def int) int {
 	return n
 }
 
-func notFound(ctx arry.Context, db store.Store, message string) {
-	data := baseData(ctx, db, "页面没找到")
+func notFound(ctx arry.Context, deps Deps, message string) {
+	data := baseData(ctx, deps, "页面没找到")
 	data["Message"] = message
 	ctx.Render(http.StatusNotFound, "404.html", data)
 }

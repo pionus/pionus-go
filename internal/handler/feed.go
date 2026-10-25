@@ -14,8 +14,8 @@ import (
 	"github.com/pionus/pionus-go/internal/store"
 )
 
-func siteBaseURL(ctx arry.Context, db store.Store) string {
-	if site := loadSite(db); site.URL != "" {
+func siteBaseURL(ctx arry.Context, deps Deps) string {
+	if site := loadSite(deps); site.URL != "" {
 		return site.URL
 	}
 	scheme := "http"
@@ -25,13 +25,13 @@ func siteBaseURL(ctx arry.Context, db store.Store) string {
 	return scheme + "://" + ctx.Request().Host
 }
 
-func Feed(db store.Store) arry.Handler {
+func Feed(deps Deps) arry.Handler {
 	return func(ctx arry.Context) {
-		base := siteBaseURL(ctx, db)
-		site := loadSite(db)
+		base := siteBaseURL(ctx, deps)
+		site := loadSite(deps)
 		now := time.Now()
 
-		posts, _, err := db.ListPosts(store.PostFilter{
+		posts, _, err := deps.Posts.ListPosts(store.PostFilter{
 			Type:            model.PostTypePost,
 			Statuses:        []string{model.StatusPublish},
 			PublishedBefore: &now,
@@ -79,12 +79,12 @@ func Feed(db store.Store) arry.Handler {
 	}
 }
 
-func NotesFeed(db store.Store) arry.Handler {
+func NotesFeed(deps Deps) arry.Handler {
 	return func(ctx arry.Context) {
-		base := siteBaseURL(ctx, db)
-		site := loadSite(db)
+		base := siteBaseURL(ctx, deps)
+		site := loadSite(deps)
 
-		notes, _, err := db.ListNotes(store.NoteFilter{
+		notes, _, err := deps.Notes.ListNotes(store.NoteFilter{
 			Statuses: []string{model.StatusPublish},
 			Page:     1,
 			Limit:    30,
@@ -122,12 +122,12 @@ func NotesFeed(db store.Store) arry.Handler {
 	}
 }
 
-func CommentsFeed(db store.Store) arry.Handler {
+func CommentsFeed(deps Deps) arry.Handler {
 	return func(ctx arry.Context) {
-		base := siteBaseURL(ctx, db)
-		site := loadSite(db)
+		base := siteBaseURL(ctx, deps)
+		site := loadSite(deps)
 
-		comments, _, err := db.ListComments(store.CommentFilter{
+		comments, _, err := deps.Comments.ListComments(store.CommentFilter{
 			Status: model.CommentApproved,
 			Page:   1,
 			Limit:  50,
@@ -168,9 +168,9 @@ func CommentsFeed(db store.Store) arry.Handler {
 	}
 }
 
-func Sitemap(db store.Store) arry.Handler {
+func Sitemap(deps Deps) arry.Handler {
 	return func(ctx arry.Context) {
-		base := siteBaseURL(ctx, db)
+		base := siteBaseURL(ctx, deps)
 		now := time.Now()
 
 		doc := urlSet{XMLNS: "http://www.sitemaps.org/schemas/sitemap/0.9"}
@@ -186,7 +186,7 @@ func Sitemap(db store.Store) arry.Handler {
 
 		page := 1
 		for {
-			posts, total, err := db.ListPosts(store.PostFilter{
+			posts, total, err := deps.Posts.ListPosts(store.PostFilter{
 				Statuses:        []string{model.StatusPublish},
 				PublishedBefore: &now,
 				Page:            page,
@@ -212,11 +212,11 @@ func Sitemap(db store.Store) arry.Handler {
 			page++
 		}
 
-		categories, _ := db.ListCategories()
+		categories, _ := deps.Taxonomy.ListCategories()
 		for _, c := range categories {
 			add(base+"/category/"+url.PathEscape(c.Slug), now.Format("2006-01-02"))
 		}
-		tags, _ := db.ListTags()
+		tags, _ := deps.Taxonomy.ListTags()
 		for _, t := range tags {
 			add(base+"/tag/"+url.PathEscape(t.Slug), now.Format("2006-01-02"))
 		}
@@ -226,9 +226,9 @@ func Sitemap(db store.Store) arry.Handler {
 	}
 }
 
-func Robots(db store.Store) arry.Handler {
+func Robots(deps Deps) arry.Handler {
 	return func(ctx arry.Context) {
-		base := siteBaseURL(ctx, db)
+		base := siteBaseURL(ctx, deps)
 		body := "User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /search\nSitemap: " + base + "/sitemap.xml\n"
 		ctx.SetHeader("Cache-Control", "public, max-age=3600")
 		ctx.SetContentType("text/plain; charset=utf-8")

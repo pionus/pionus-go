@@ -21,7 +21,7 @@ func TestNotFoundIsThemed(t *testing.T) {
 
 	app := arry.New()
 	app.ViewsWithConfig(web.EngineConfig())
-	app.Router().Get("/*", NotFound(db))
+	app.Router().Get("/*", NotFound(NewDeps(db)))
 
 	req := httptest.NewRequest(http.MethodGet, "/index.php/archives/1/", nil)
 	rec := httptest.NewRecorder()

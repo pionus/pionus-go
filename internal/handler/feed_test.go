@@ -45,9 +45,10 @@ func TestRobotsAndSitemap(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	deps := NewDeps(db)
 	app := arry.New()
-	app.Router().Get("/robots.txt", Robots(db))
-	app.Router().Get("/sitemap.xml", Sitemap(db))
+	app.Router().Get("/robots.txt", Robots(deps))
+	app.Router().Get("/sitemap.xml", Sitemap(deps))
 
 	robots := feedRequest(app, "/robots.txt")
 	if robots.Code != http.StatusOK {
@@ -79,8 +80,9 @@ func TestNotesFeed(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	deps := NewDeps(db)
 	app := arry.New()
-	app.Router().Get("/feed/notes", NotesFeed(db))
+	app.Router().Get("/feed/notes", NotesFeed(deps))
 	rec := feedRequest(app, "/feed/notes")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d", rec.Code)
@@ -108,8 +110,9 @@ func TestFeedSkipsPasswordPosts(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	deps := NewDeps(db)
 	app := arry.New()
-	app.Router().Get("/feed", Feed(db))
+	app.Router().Get("/feed", Feed(deps))
 
 	rec := feedRequest(app, "/feed")
 	if rec.Code != http.StatusOK {
