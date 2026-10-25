@@ -13,9 +13,10 @@ import (
 func (s *SQLiteStore) ListCategories() ([]*model.Category, error) {
 	rows, err := s.db.Query(`
 		SELECT c.id, c.name, c.slug, c.description, c.parent_id, c.sort_order, c.created_at,
-		       COUNT(DISTINCT pc.post_id) AS post_count
+		       COUNT(DISTINCT CASE WHEN p.status = 'publish' THEN pc.post_id END) AS post_count
 		FROM categories c
 		LEFT JOIN post_categories pc ON pc.category_id = c.id
+		LEFT JOIN posts p ON p.id = pc.post_id
 		GROUP BY c.id
 		ORDER BY c.sort_order ASC, c.name ASC`)
 	if err != nil {
@@ -37,9 +38,10 @@ func (s *SQLiteStore) ListCategories() ([]*model.Category, error) {
 func (s *SQLiteStore) GetCategory(slug string) (*model.Category, error) {
 	c, err := scanCategory(s.db.QueryRow(`
 		SELECT c.id, c.name, c.slug, c.description, c.parent_id, c.sort_order, c.created_at,
-		       COUNT(DISTINCT pc.post_id) AS post_count
+		       COUNT(DISTINCT CASE WHEN p.status = 'publish' THEN pc.post_id END) AS post_count
 		FROM categories c
 		LEFT JOIN post_categories pc ON pc.category_id = c.id
+		LEFT JOIN posts p ON p.id = pc.post_id
 		WHERE c.slug = ?
 		GROUP BY c.id`, slug))
 	if err != nil {
@@ -120,9 +122,10 @@ func (s *SQLiteStore) DeleteCategory(slug string) error {
 func (s *SQLiteStore) ListTags() ([]*model.Tag, error) {
 	rows, err := s.db.Query(`
 		SELECT t.id, t.name, t.slug, t.hidden, t.password_hash, t.created_at,
-		       COUNT(DISTINCT pt.post_id) AS post_count
+		       COUNT(DISTINCT CASE WHEN p.status = 'publish' THEN pt.post_id END) AS post_count
 		FROM tags t
 		LEFT JOIN post_tags pt ON pt.tag_id = t.id
+		LEFT JOIN posts p ON p.id = pt.post_id
 		GROUP BY t.id
 		ORDER BY t.name ASC`)
 	if err != nil {
@@ -144,9 +147,10 @@ func (s *SQLiteStore) ListTags() ([]*model.Tag, error) {
 func (s *SQLiteStore) GetTag(slug string) (*model.Tag, error) {
 	t, err := scanTag(s.db.QueryRow(`
 		SELECT t.id, t.name, t.slug, t.hidden, t.password_hash, t.created_at,
-		       COUNT(DISTINCT pt.post_id) AS post_count
+		       COUNT(DISTINCT CASE WHEN p.status = 'publish' THEN pt.post_id END) AS post_count
 		FROM tags t
 		LEFT JOIN post_tags pt ON pt.tag_id = t.id
+		LEFT JOIN posts p ON p.id = pt.post_id
 		WHERE t.slug = ?
 		GROUP BY t.id`, slug))
 	if err != nil {

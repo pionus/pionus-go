@@ -123,3 +123,46 @@ func TestFeedSkipsPasswordPosts(t *testing.T) {
 		t.Fatalf("feed leaked or missed posts: %s", body)
 	}
 }
+
+func TestCommentsFeedSkipsNonPublishedPosts(t *testing.T) {
+	db := newFeedStore(t)
+	if err := db.SetOption("site.url", "https://example.com"); err != nil {
+		t.Fatal(err)
+	}
+	draft := &model.Post{
+		Slug: "draft", Title: "Draft", Content: "body", Status: model.StatusDraft,
+	}
+	if err := db.CreatePost(draft); err != nil {
+		t.Fatal(err)
+	}
+	published := &model.Post{
+		Slug: "published", Title: "Published", Content: "body", Status: model.StatusPublish,
+	}
+	if err := db.CreatePost(published); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.CreateComment(&model.Comment{
+		PostID: draft.ID, Author: "Draft Reader", Content: "draft comment", Status: model.CommentApproved,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.CreateComment(&model.Comment{
+		PostID: published.ID, Author: "Reader", Content: "published comment", Status: model.CommentApproved,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	app := arry.New()
+	app.Router().Get("/feed/comments", CommentsFeed(NewDeps(db)))
+	rec := feedRequest(app, "/feed/comments")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if strings.Contains(body, "draft comment") {
+		t.Fatal("comments feed leaked a draft post")
+	}
+	if !strings.Contains(body, "published comment") {
+		t.Fatal("comments feed omitted a published post")
+	}
+}

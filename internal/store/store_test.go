@@ -631,3 +631,38 @@ func TestHiddenTagVisibility(t *testing.T) {
 		t.Fatalf("name lookup created duplicate tag: %+v", reused)
 	}
 }
+
+func TestTagCountsOnlyPublishedPosts(t *testing.T) {
+	s := newTestStore(t)
+	tag := &model.Tag{Name: "Go", Slug: "go-count"}
+	if err := s.CreateTag(tag); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CreatePost(&model.Post{
+		Slug: "published-tag", Title: "Published", Content: "body",
+		Status: model.StatusPublish, TagIDs: []int64{tag.ID},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CreatePost(&model.Post{
+		Slug: "draft-tag", Title: "Draft", Content: "body",
+		Status: model.StatusDraft, TagIDs: []int64{tag.ID},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	tags, err := s.ListTags()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tags) != 1 || tags[0].PostCount != 1 {
+		t.Fatalf("tags = %+v", tags)
+	}
+	got, err := s.GetTag("go-count")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.PostCount != 1 {
+		t.Fatalf("GetTag count = %d", got.PostCount)
+	}
+}

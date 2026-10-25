@@ -93,7 +93,8 @@ func (s *SQLiteStore) ListComments(f CommentFilter) ([]*model.Comment, int, erro
 	rows, err := s.db.Query(`
 		SELECT c.id, c.post_id, c.parent_id, c.author, c.email, c.url, c.content,
 		       c.status, c.ip, c.user_agent, c.created_at, c.source, c.source_id,
-		       p.title, p.slug, CASE WHEN p.post_password <> '' THEN 1 ELSE 0 END,
+		       p.title, p.slug, p.status,
+		       CASE WHEN p.post_password <> '' THEN 1 ELSE 0 END,
 		       CASE WHEN EXISTS (
 		           SELECT 1 FROM post_tags hp JOIN tags ht ON ht.id = hp.tag_id
 		           WHERE hp.post_id = p.id AND ht.hidden = 1
@@ -111,12 +112,12 @@ func (s *SQLiteStore) ListComments(f CommentFilter) ([]*model.Comment, int, erro
 	for rows.Next() {
 		c := &model.Comment{}
 		var parentID sql.NullInt64
-		var postTitle, postSlug sql.NullString
+		var postTitle, postSlug, postStatus sql.NullString
 		var postLocked, postHidden int
 		if err := rows.Scan(
 			&c.ID, &c.PostID, &parentID, &c.Author, &c.Email, &c.URL, &c.Content,
 			&c.Status, &c.IP, &c.UserAgent, &c.CreatedAt, &c.Source, &c.SourceID,
-			&postTitle, &postSlug, &postLocked, &postHidden,
+			&postTitle, &postSlug, &postStatus, &postLocked, &postHidden,
 		); err != nil {
 			return nil, 0, fmt.Errorf("scan comment: %w", err)
 		}
@@ -126,6 +127,7 @@ func (s *SQLiteStore) ListComments(f CommentFilter) ([]*model.Comment, int, erro
 		}
 		c.PostTitle = postTitle.String
 		c.PostSlug = postSlug.String
+		c.PostStatus = postStatus.String
 		c.PostLocked = postLocked != 0
 		c.PostHidden = postHidden != 0
 		comments = append(comments, c)

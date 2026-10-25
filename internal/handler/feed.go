@@ -151,7 +151,7 @@ func CommentsFeed(deps Deps) arry.Handler {
 			},
 		}
 		for _, c := range comments {
-			if c.PostSlug == "" || c.PostLocked || c.PostHidden {
+			if c.PostSlug == "" || c.PostLocked || c.PostHidden || c.PostStatus != model.StatusPublish {
 				continue
 			}
 			link := base + "/article/" + c.PostSlug + "#comment-" + strconv.FormatInt(c.ID, 10)

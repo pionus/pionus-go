@@ -33,6 +33,8 @@ type Comment struct {
 	// PostHidden is set by listing queries when the parent post belongs to a
 	// hidden tag.
 	PostHidden bool `json:"-"`
+	// PostStatus is set by listing queries for public feed filtering.
+	PostStatus string `json:"-"`
 
 	// Source and SourceID identify imported comments.
 	Source   string `json:"-"`
