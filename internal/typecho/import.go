@@ -112,34 +112,14 @@ func Import(reader io.Reader, opts Options) (*Report, error) {
 		return im.dryRun()
 	}
 
-	if err := im.importUsers(); err != nil {
-		return nil, err
-	}
-	if err := im.importMetas(); err != nil {
-		return nil, err
-	}
-	im.buildRelations()
-	if err := im.prepareSlugs(); err != nil {
-		return nil, err
-	}
-	if err := im.importContents(); err != nil {
-		return nil, err
-	}
-	if err := im.importComments(); err != nil {
-		return nil, err
-	}
-	if err := im.importNotes(); err != nil {
-		return nil, err
-	}
-	if len(im.opts.PageOverrides) > 0 {
-		pages, err := ApplyPageOverrides(im.opts.Store, im.opts.PageOverrides, false)
-		if err != nil {
+	if tx, ok := opts.Store.(store.Transactional); ok {
+		if err := tx.WithTx(func(st store.Store) error {
+			im.opts.Store = st
+			return im.run()
+		}); err != nil {
 			return nil, err
 		}
-		im.report.PagesOverridden = len(pages.Applied)
-		im.report.MissingPages = pages.Missing
-	}
-	if err := im.applySiteOptions(); err != nil {
+	} else if err := im.run(); err != nil {
 		return nil, err
 	}
 
@@ -153,6 +133,37 @@ func Import(reader io.Reader, opts Options) (*Report, error) {
 	}
 
 	return im.report, nil
+}
+
+func (im *importer) run() error {
+	if err := im.importUsers(); err != nil {
+		return err
+	}
+	if err := im.importMetas(); err != nil {
+		return err
+	}
+	im.buildRelations()
+	if err := im.prepareSlugs(); err != nil {
+		return err
+	}
+	if err := im.importContents(); err != nil {
+		return err
+	}
+	if err := im.importComments(); err != nil {
+		return err
+	}
+	if err := im.importNotes(); err != nil {
+		return err
+	}
+	if len(im.opts.PageOverrides) > 0 {
+		pages, err := ApplyPageOverrides(im.opts.Store, im.opts.PageOverrides, false)
+		if err != nil {
+			return err
+		}
+		im.report.PagesOverridden = len(pages.Applied)
+		im.report.MissingPages = pages.Missing
+	}
+	return im.applySiteOptions()
 }
 
 func (im *importer) dryRun() (*Report, error) {

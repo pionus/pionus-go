@@ -302,15 +302,29 @@ func (s *SQLiteStore) AdjacentPosts(slug string) (prev, next *model.Post, err er
 }
 
 func (s *SQLiteStore) CreatePost(p *model.Post) error {
-	normalizePost(p)
-
-	tx, err := s.db.Begin()
+	if s.inTx {
+		return s.createPost(p)
+	}
+	tx, err := s.raw.Begin()
 	if err != nil {
 		return fmt.Errorf("begin create post: %w", err)
 	}
 	defer tx.Rollback()
 
-	res, err := tx.Exec(
+	txStore := &SQLiteStore{db: tx, raw: s.raw, inTx: true}
+	if err := txStore.createPost(p); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit create post: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLiteStore) createPost(p *model.Post) error {
+	normalizePost(p)
+
+	res, err := s.db.Exec(
 		`INSERT INTO posts
 			(slug, title, content, excerpt, cover, type, status, format, template,
 			 source, source_id, author_id, post_password, allow_comment, pinned,
@@ -331,41 +345,51 @@ func (s *SQLiteStore) CreatePost(p *model.Post) error {
 	p.ID, _ = res.LastInsertId()
 
 	if p.CategoryIDs != nil {
-		if err := replacePostCategories(tx, p.ID, p.CategoryIDs); err != nil {
+		if err := replacePostCategories(s.db, p.ID, p.CategoryIDs); err != nil {
 			return err
 		}
 	}
 	if p.TagIDs != nil {
-		if err := replacePostTags(tx, p.ID, p.TagIDs); err != nil {
+		if err := replacePostTags(s.db, p.ID, p.TagIDs); err != nil {
 			return err
 		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit create post: %w", err)
 	}
 	return nil
 }
 
 func (s *SQLiteStore) UpdatePost(slug string, p *model.Post) error {
-	normalizePost(p)
-	p.UpdatedAt = time.Now()
-
-	tx, err := s.db.Begin()
+	if s.inTx {
+		return s.updatePost(slug, p)
+	}
+	tx, err := s.raw.Begin()
 	if err != nil {
 		return fmt.Errorf("begin update post: %w", err)
 	}
 	defer tx.Rollback()
 
+	txStore := &SQLiteStore{db: tx, raw: s.raw, inTx: true}
+	if err := txStore.updatePost(slug, p); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit update post: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLiteStore) updatePost(slug string, p *model.Post) error {
+	normalizePost(p)
+	p.UpdatedAt = time.Now()
+
 	var id int64
-	if err := tx.QueryRow(`SELECT id FROM posts WHERE slug = ?`, slug).Scan(&id); err != nil {
+	if err := s.db.QueryRow(`SELECT id FROM posts WHERE slug = ?`, slug).Scan(&id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
 		}
 		return fmt.Errorf("find post: %w", err)
 	}
 
-	_, err = tx.Exec(
+	_, err := s.db.Exec(
 		`UPDATE posts SET
 			title = ?, content = ?, excerpt = ?, cover = ?, type = ?, status = ?,
 			format = ?, template = ?,
@@ -387,18 +411,14 @@ func (s *SQLiteStore) UpdatePost(slug string, p *model.Post) error {
 	}
 
 	if p.CategoryIDs != nil {
-		if err := replacePostCategories(tx, id, p.CategoryIDs); err != nil {
+		if err := replacePostCategories(s.db, id, p.CategoryIDs); err != nil {
 			return err
 		}
 	}
 	if p.TagIDs != nil {
-		if err := replacePostTags(tx, id, p.TagIDs); err != nil {
+		if err := replacePostTags(s.db, id, p.TagIDs); err != nil {
 			return err
 		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit update post: %w", err)
 	}
 
 	p.ID = id

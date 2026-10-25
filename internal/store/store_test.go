@@ -32,6 +32,32 @@ func mustPost(t *testing.T, s *SQLiteStore, p *model.Post) *model.Post {
 	return got
 }
 
+func TestWithTx(t *testing.T) {
+	s := newTestStore(t)
+
+	if err := s.WithTx(func(tx Store) error {
+		return tx.CreatePost(&model.Post{Slug: "tx-post", Title: "TX", Content: "body", Status: model.StatusPublish})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.GetPost("tx-post"); err != nil {
+		t.Fatal("committed transaction post missing")
+	}
+
+	wantErr := errors.New("rollback")
+	if err := s.WithTx(func(tx Store) error {
+		if err := tx.CreatePost(&model.Post{Slug: "rolled-back", Title: "No", Content: "body", Status: model.StatusPublish}); err != nil {
+			return err
+		}
+		return wantErr
+	}); !errors.Is(err, wantErr) {
+		t.Fatalf("err = %v, want rollback error", err)
+	}
+	if _, err := s.GetPost("rolled-back"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("rolled-back post exists: %v", err)
+	}
+}
+
 func TestPing(t *testing.T) {
 	s := newTestStore(t)
 	if err := s.Ping(context.Background()); err != nil {

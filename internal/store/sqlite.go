@@ -20,8 +20,17 @@ import (
 var migrationsFS embed.FS
 
 // SQLiteStore is the SQLite-backed implementation of Store.
+// dbHandle is implemented by both *sql.DB and *sql.Tx.
+type dbHandle interface {
+	Exec(query string, args ...any) (sql.Result, error)
+	Query(query string, args ...any) (*sql.Rows, error)
+	QueryRow(query string, args ...any) *sql.Row
+}
+
 type SQLiteStore struct {
-	db *sql.DB
+	db   dbHandle
+	raw  *sql.DB
+	inTx bool
 
 	optionsMu     sync.RWMutex
 	options       map[string]string
@@ -54,7 +63,7 @@ func NewSQLite(dbPath string) (*SQLiteStore, error) {
 		return nil, fmt.Errorf("ping database: %w", err)
 	}
 
-	s := &SQLiteStore{db: db}
+	s := &SQLiteStore{db: db, raw: db}
 	if err := s.migrate(); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("run migrations: %w", err)
@@ -64,19 +73,49 @@ func NewSQLite(dbPath string) (*SQLiteStore, error) {
 }
 
 func (s *SQLiteStore) Ping(ctx context.Context) error {
-	return s.db.PingContext(ctx)
+	return s.raw.PingContext(ctx)
 }
 
 func (s *SQLiteStore) Close() error {
-	return s.db.Close()
+	return s.raw.Close()
 }
 
 // Backup writes a consistent snapshot to path using VACUUM INTO.
 func (s *SQLiteStore) Backup(path string) error {
 	quoted := strings.ReplaceAll(path, "'", "''")
-	if _, err := s.db.Exec("VACUUM INTO '" + quoted + "'"); err != nil {
+	if _, err := s.raw.Exec("VACUUM INTO '" + quoted + "'"); err != nil {
 		return fmt.Errorf("backup database: %w", err)
 	}
+	return nil
+}
+
+// Transactional is implemented by stores that can run a callback atomically.
+type Transactional interface {
+	WithTx(fn func(Store) error) error
+}
+
+// WithTx runs fn inside a SQLite transaction. Nested calls share the outer
+// transaction.
+func (s *SQLiteStore) WithTx(fn func(Store) error) error {
+	if s.inTx {
+		return fn(s)
+	}
+	tx, err := s.raw.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	txStore := &SQLiteStore{db: tx, raw: s.raw, inTx: true}
+	if err := fn(txStore); err != nil {
+		tx.Rollback()
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+	s.optionsMu.Lock()
+	s.optionsLoaded = false
+	s.options = nil
+	s.optionsMu.Unlock()
 	return nil
 }
 
@@ -113,7 +152,7 @@ func (s *SQLiteStore) migrate() error {
 			return fmt.Errorf("read migration %s: %w", version, err)
 		}
 
-		tx, err := s.db.Begin()
+		tx, err := s.raw.Begin()
 		if err != nil {
 			return fmt.Errorf("begin migration %s: %w", version, err)
 		}
