@@ -5,13 +5,15 @@
 #   TYPECHO_EXPORT=typecho.json TYPECHO_UPLOADS=/backup/usr/uploads \
 #     ./scripts/migrate-typecho.sh
 #
+#   TYPECHO_BUNDLE=typecho-bundle.zip ./scripts/migrate-typecho.sh
+#
 #   TYPECHO_ROOT=/www/blog TYPECHO_UPLOADS=/www/blog/usr/uploads \
 #     ./scripts/migrate-typecho.sh --dry-run
 #
 #   ./scripts/migrate-typecho.sh --skip-import   # only repair links + audit
 #
-# The old Typecho URLs are intentionally not preserved; links inside imported
-# content are rewritten to the new routes and everything else returns 404.
+# Links inside imported content are rewritten to the new routes. To preserve
+# old Typecho URLs, enable the typecho-redirects plugin in config.yaml.
 
 set -euo pipefail
 
@@ -20,6 +22,7 @@ cd "$ROOT"
 
 CONFIG="${PIONUS_CONFIG:-config.yaml}"
 EXPORT="${TYPECHO_EXPORT:-}"
+BUNDLE="${TYPECHO_BUNDLE:-}"
 UPLOADS="${TYPECHO_UPLOADS:-}"
 ROOT_TYPECHO="${TYPECHO_ROOT:-}"
 
@@ -28,7 +31,7 @@ if [[ ! -f "$CONFIG" ]]; then
   exit 1
 fi
 
-if [[ -z "$EXPORT" && -n "$ROOT_TYPECHO" ]]; then
+if [[ -z "$BUNDLE" && -z "$EXPORT" && -n "$ROOT_TYPECHO" ]]; then
   if ! command -v php >/dev/null 2>&1; then
     echo "php is required to export from TYPECHO_ROOT=$ROOT_TYPECHO" >&2
     exit 1
@@ -39,6 +42,9 @@ if [[ -z "$EXPORT" && -n "$ROOT_TYPECHO" ]]; then
 fi
 
 ARGS=(-config "$CONFIG")
+if [[ -n "$BUNDLE" ]]; then
+  ARGS+=(-bundle "$BUNDLE")
+fi
 if [[ -n "$EXPORT" ]]; then
   ARGS+=(-export "$EXPORT")
 fi
@@ -59,5 +65,5 @@ Next steps:
   2. Reset the imported owner account:
        PIONUS_ADMIN_PASSWORD='new-password' ./pionus -config <config> -create-admin <username>
   3. Start the server and spot-check new URLs under /article, /category, /tag.
-     Old Typecho .php/.html URLs are intentionally not redirected.
+     Enable plugins.enabled: [typecho-redirects] to 301 common old Typecho URLs.
 EOF

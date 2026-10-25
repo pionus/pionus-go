@@ -91,6 +91,7 @@ footer{max-width:1120px;margin:0 auto;padding:0 24px 40px;color:var(--muted);fon
     <a href="/admin/categories" {{if contains .Path "/categories"}}class="active"{{end}}>分类</a>
     <a href="/admin/tags" {{if contains .Path "/tags"}}class="active"{{end}}>标签</a>
     {{if .User.CanManage}}<a href="/admin/users" {{if contains .Path "/users"}}class="active"{{end}}>用户</a>{{end}}
+    {{if .User.CanManage}}<a href="/admin/import" {{if contains .Path "/import"}}class="active"{{end}}>导入</a>{{end}}
     <a href="/admin/settings" {{if contains .Path "/settings"}}class="active"{{end}}>设置</a>
   </nav>
   <div class="me">

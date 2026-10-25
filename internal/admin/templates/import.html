@@ -1,0 +1,44 @@
+{{template "layout" .}}
+
+{{define "content"}}
+<h1>导入 Typecho</h1>
+
+{{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+
+<div class="panel">
+  <h2>迁移包</h2>
+  <p class="muted">
+    上传一个 ZIP，里面包含 <code>typecho.json</code> 和可选的
+    <code>uploads/</code> 或 <code>usr/uploads/</code> 目录。
+  </p>
+  <form method="post" action="/admin/import" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf" value="{{.CSRF}}">
+    <div class="field">
+      <label for="bundle">Typecho 迁移包（ZIP）</label>
+      <input id="bundle" type="file" name="bundle" accept=".zip,application/zip" required>
+    </div>
+    <label class="check">
+      <input type="checkbox" name="drafts" value="1">
+      导入 Typecho 自动保存草稿
+    </label>
+    <label class="check">
+      <input type="checkbox" name="dry_run" value="1">
+      只预览，不写入数据库
+    </label>
+    <div style="margin-top:18px">
+      <button class="btn primary" type="submit">开始导入</button>
+    </div>
+  </form>
+  <p class="muted" style="margin-top:14px">
+    导入是幂等的，可以重复执行。导入用户没有密码，请在导入后通过
+    <code>pionus -create-admin</code> 重置管理员密码。
+  </p>
+</div>
+
+{{if .Report}}
+<div class="panel">
+  <h2>导入报告</h2>
+  <pre style="white-space:pre-wrap;overflow:auto">{{.Report}}</pre>
+</div>
+{{end}}
+{{end}}

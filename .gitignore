@@ -5,7 +5,7 @@
 *.so
 *.db
 logs
-pionus
+/pionus
 .env
 data/
 
@@ -22,3 +22,5 @@ typecho.sql
 *.db.bak-*
 
 backups/
+
+/pionus-migrate

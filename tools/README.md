@@ -21,7 +21,25 @@ Copy the attachment directory as well if you want images:
 tar -C /www/blog/usr/uploads -czf uploads.tgz .
 ```
 
-## 2. Dry run on the new server
+## 2. Bundle the export and uploads
+
+Instead of passing two paths, create a ZIP bundle:
+
+```text
+typecho-bundle.zip
+  typecho.json
+  uploads/
+    2015/03/image.jpg
+```
+
+Then import directly:
+
+```bash
+TYPECHO_BUNDLE=typecho-bundle.zip ./scripts/migrate-typecho.sh --dry-run
+TYPECHO_BUNDLE=typecho-bundle.zip ./scripts/migrate-typecho.sh
+```
+
+## 3. Dry run on the new server
 
 ```bash
 TYPECHO_EXPORT=typecho.json \
@@ -32,7 +50,7 @@ TYPECHO_UPLOADS=/path/to/old/usr/uploads \
 This imports nothing, repairs nothing and audits nothing; it prints the
 counts and warnings that a real run would produce.
 
-## 3. Import, repair links and audit
+## 4. Import, repair links and audit
 
 ```bash
 TYPECHO_EXPORT=typecho.json \
@@ -92,12 +110,17 @@ PIONUS_ADMIN_PASSWORD='new-password' pionus -config config.yaml -create-admin Se
   `typecho_weiyu` table on the old server, so these six 2018 short posts are
   the only timeline data available.
 
-Old Typecho URLs are deliberately not redirected: `/index.php/...`,
-`/<slug>.html`, `/2015/03/` and similar addresses return the new site's 404.
-Bookmarks and external links to those addresses will break by design.
+Old Typecho URLs are not stored in the core database. Enable the optional
+`typecho-redirects` plugin to 301 common old URLs:
+
+```yaml
+plugins:
+  enabled:
+    - typecho-redirects
+```
 
 If the new site lives on a different domain, update `site.url` in the admin
-settings after importing; feeds and the sitemap use it.
+settings after importing; feeds, sitemap and redirects use the new routes.
 
 ## Image audit
 
@@ -117,6 +140,6 @@ keeps a link to the original.
 
 - Typecho `post_draft` autosave revisions are skipped by default. Pass
   `-drafts` to import them as drafts.
-- Password-protected posts are stored but password gating is not implemented.
-- The old server's `usr/uploads` directory was empty; three attachment files
-  are missing unless another backup exists.
+- Password-protected posts are imported and gated by Pionus.
+- Three attachment files were missing on the original server; they cannot be
+  recovered from the database unless another backup exists.

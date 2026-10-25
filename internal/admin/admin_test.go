@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"fmt"
@@ -476,6 +477,49 @@ func TestAdminHiddenTag(t *testing.T) {
 	resp.Body.Close()
 	if _, err := e.store.GetTag("no-password"); err == nil {
 		t.Fatal("hidden tag without password was created")
+	}
+}
+
+func TestAdminImportBundle(t *testing.T) {
+	e := newTestEnv(t)
+	e.setup(t)
+
+	resp := e.get(t, "/admin/import")
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), "导入 Typecho") {
+		t.Fatalf("import page status=%d body=%s", resp.StatusCode, body)
+	}
+
+	var bundle bytes.Buffer
+	zw := zip.NewWriter(&bundle)
+	entry, _ := zw.Create("typecho.json")
+	_, _ = entry.Write([]byte(`{"site":{"url":"https://example.com"},"contents":[],"metas":[],"comments":[],"users":[]}`))
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	var form bytes.Buffer
+	mw := multipart.NewWriter(&form)
+	_ = mw.WriteField("_csrf", e.csrf(t))
+	_ = mw.WriteField("dry_run", "1")
+	part, _ := mw.CreateFormFile("bundle", "typecho-bundle.zip")
+	_, _ = part.Write(bundle.Bytes())
+	_ = mw.Close()
+
+	req, err := http.NewRequest(http.MethodPost, e.base+"/admin/import", &form)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	resp, err = e.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), "导入报告") {
+		t.Fatalf("import status=%d body=%s", resp.StatusCode, body)
 	}
 }
 

@@ -37,6 +37,7 @@ type verifyReport struct {
 func main() {
 	configPath := flag.String("config", "config.yaml", "config file path")
 	exportPath := flag.String("export", "", "Typecho JSON export from tools/typecho-export.php")
+	bundlePath := flag.String("bundle", "", "ZIP bundle containing typecho.json and uploads/usr uploads")
 	sourceUploads := flag.String("source-uploads", "", "old Typecho usr/uploads directory")
 	destUploads := flag.String("dest-uploads", "", "new uploads directory (defaults to upload.dir)")
 	dryRun := flag.Bool("dry-run", false, "report what would change without writing")
@@ -71,6 +72,21 @@ func main() {
 	uploads := *destUploads
 	if uploads == "" {
 		uploads = cfg.Upload.Dir
+	}
+
+	if *bundlePath != "" {
+		if *exportPath != "" {
+			fatal("invalid flags", fmt.Errorf("use either -bundle or -export, not both"))
+		}
+		bundleDir, bundleExport, bundleUploads, err := typecho.ExtractBundle(*bundlePath)
+		if err != nil {
+			fatal("extract Typecho bundle", err)
+		}
+		defer os.RemoveAll(bundleDir)
+		*exportPath = bundleExport
+		if *sourceUploads == "" {
+			*sourceUploads = bundleUploads
+		}
 	}
 
 	if !*dryRun && *backup {

@@ -139,6 +139,17 @@ func (a *Admin) Register(app *arry.Arry) {
 	priv.Post("/settings", a.requireManager(a.settingsSave))
 
 	app.Router().Graft(auth.AdminBase, priv)
+
+	// Import uploads can be larger than normal media uploads, so keep this
+	// route on a separate router with its own body limit.
+	importRouter := arry.NewRouter(
+		middlewares.BodyLimit(512<<20),
+		csrf,
+		a.auth.RequireUser,
+	)
+	importRouter.Get("/import", a.requireManager(a.importPage))
+	importRouter.Post("/import", a.requireManager(a.importSubmit))
+	app.Router().Graft(auth.AdminBase, importRouter)
 }
 
 func (a *Admin) render(ctx arry.Context, code int, name string, data map[string]any) {
