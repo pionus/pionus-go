@@ -54,6 +54,8 @@ pionus-go/
 ├── deploy/
 │   ├── k8s/pionus.yaml           # Deployment, Service, PVC
 │   └── README.md                 # Deployment/Caddy/backup notes
+├── docs/
+│   └── backlog.md                # Deferred design work (handler boundaries, inline math)
 ├── internal/
 │   ├── config/                   # Config loader (YAML + env)
 │   ├── server/                   # App wiring, middleware and routes
@@ -400,7 +402,10 @@ Old Typecho URLs intentionally return 404.
 Remaining polish:
 
 1. Comment email notifications and a persistent/shared rate limiter.
-2. Narrow handler dependencies and split large store interfaces.
-3. Inline `$...$` math (currently `$$` / `\(` / `\[` only, to avoid PHP `$`).
-4. Recover the three missing Typecho attachments if a backup exists.
-5. Point DNS at the new host and run the production migration.
+2. Recover the three missing Typecho attachments if a backup exists.
+3. Point DNS at the new host and run the production migration.
+
+Deferred design work is documented in `docs/backlog.md`:
+
+- [Handler 接口窄化](docs/backlog.md#handler-boundaries)
+- [行内 `$...$` 公式](docs/backlog.md#inline-math)

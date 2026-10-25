@@ -101,5 +101,8 @@ The project and the arry framework are developed together via `go.work`; see
 
 Implemented: content model, storage layer, public pages, Paper & Ink theme,
 native comments, JSON API, admin UI, authentication, uploads, Typecho import,
-RSS/sitemap and image audit. Next: deploy, localize surviving legacy images and
-password-protected post gating.
+RSS/sitemap, password-protected posts, signed draft previews, user management,
+FTS5 search, deployment/backup/CI assets and image audit.
+
+Deferred design work is tracked in [docs/backlog.md](docs/backlog.md), including
+handler interface boundaries and inline `$...$` math.
