@@ -20,3 +20,16 @@ func TestRenderPostCachedInvalidatesOnContentChange(t *testing.T) {
 		t.Fatalf("cache did not invalidate: %s", second.HTML)
 	}
 }
+
+func TestRenderPostCachedIncludesMathFlag(t *testing.T) {
+	p := &model.Post{ID: 43, Format: model.FormatMarkdown, Content: "Inline $x$"}
+	if first := RenderPostCached(p); first.InlineMath {
+		t.Fatal("inline math enabled before opt-in")
+	}
+
+	p.Math = true
+	second := RenderPostCached(p)
+	if !second.InlineMath || !second.HasMath {
+		t.Fatalf("math flag did not invalidate cache: %+v", second)
+	}
+}

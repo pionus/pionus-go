@@ -2,15 +2,20 @@ package content
 
 import (
 	"bytes"
+	stdhtml "html"
 	"html/template"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/pionus/pionus-go/internal/model"
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer/html"
+	"github.com/yuin/goldmark/text"
+	"github.com/yuin/goldmark/util"
 	golanghtml "golang.org/x/net/html"
 )
 
@@ -27,6 +32,8 @@ type RenderedPost struct {
 	TOC     []TOCItem
 	HasMath bool
 	HasCode bool
+	// InlineMath reports whether the post contains rendered $...$ math.
+	InlineMath bool
 }
 
 var postMarkdown = goldmark.New(
@@ -34,6 +41,60 @@ var postMarkdown = goldmark.New(
 	goldmark.WithParserOptions(parser.WithAutoHeadingID()),
 	goldmark.WithRendererOptions(html.WithUnsafe()),
 )
+
+// mathMarkdown protects inline $...$ spans from Markdown emphasis parsing.
+var mathMarkdown = goldmark.New(
+	goldmark.WithExtensions(extension.GFM),
+	goldmark.WithParserOptions(
+		parser.WithAutoHeadingID(),
+		parser.WithInlineParsers(util.Prioritized(&inlineMathParser{}, 450)),
+	),
+	goldmark.WithRendererOptions(html.WithUnsafe()),
+)
+
+// inlineMathParser turns $...$ into the explicit \(...\) delimiter. Keeping
+// the conversion inside the Markdown parser prevents underscores and stars in
+// formulas from being interpreted as emphasis.
+type inlineMathParser struct{}
+
+func (p *inlineMathParser) Trigger() []byte { return []byte{'$'} }
+
+func (p *inlineMathParser) Parse(parent ast.Node, block text.Reader, pc parser.Context) ast.Node {
+	line, _ := block.PeekLine()
+	if len(line) < 2 || line[0] != '$' || line[1] == '$' {
+		return nil
+	}
+	if block.PrecendingCharacter() == '$' || block.PrecendingCharacter() == '\\' {
+		return nil
+	}
+
+	for i := 1; i < len(line); i++ {
+		if line[i] == '\\' {
+			i++
+			continue
+		}
+		if line[i] != '$' {
+			continue
+		}
+		if i+1 < len(line) && line[i+1] == '$' {
+			i++
+			continue
+		}
+		inner := string(line[1:i])
+		if !looksLikeInlineMath(inner) {
+			return nil
+		}
+		block.Advance(i + 1)
+		value := make([]byte, 0, len(inner)+4)
+		value = append(value, '\\', '(')
+		value = append(value, stdhtml.EscapeString(inner)...)
+		value = append(value, '\\', ')')
+		node := ast.NewString(value)
+		node.SetRaw(true)
+		return node
+	}
+	return nil
+}
 
 // RenderPost converts a post body to display HTML, normalizes legacy markup,
 // assigns heading IDs and extracts a table of contents.
@@ -43,32 +104,128 @@ func RenderPost(p *model.Post) RenderedPost {
 		raw = p.Content
 	} else {
 		var buf bytes.Buffer
-		if err := postMarkdown.Convert([]byte(p.Content), &buf); err != nil {
+		engine := postMarkdown
+		if p.Math {
+			engine = mathMarkdown
+		}
+		if err := engine.Convert([]byte(p.Content), &buf); err != nil {
 			raw = p.Content
 		} else {
 			raw = buf.String()
 		}
 	}
 
-	normalized, toc := normalizeContent(raw)
+	normalized, toc := normalizeContent(raw, p.Math && p.Format == model.FormatHTML)
 	return RenderedPost{
-		HTML:    template.HTML(normalized),
-		TOC:     toc,
-		HasMath: hasMath(p.Content),
-		HasCode: strings.Contains(normalized, "<pre"),
+		HTML:       template.HTML(normalized),
+		TOC:        toc,
+		HasMath:    hasMath(normalized),
+		HasCode:    strings.Contains(normalized, "<pre"),
+		InlineMath: p.Math && strings.Contains(normalized, `\(`),
 	}
 }
 
-// hasMath avoids enabling KaTeX for ordinary dollar signs in PHP or shell
-// snippets. Display math and explicit LaTeX delimiters are unambiguous.
-func hasMath(source string) bool {
-	return strings.Contains(source, "$$") ||
-		strings.Contains(source, "\\(") ||
-		strings.Contains(source, "\\[")
+func hasMath(rendered string) bool {
+	return strings.Contains(rendered, "$$") ||
+		strings.Contains(rendered, `\(`) ||
+		strings.Contains(rendered, `\[`)
+}
+
+// looksLikeInlineMath rejects currency and prose while accepting common LaTeX
+// constructs. Structural characters (backslash, ^, _, =, braces) and letters
+// are enough; bare numbers are treated as money.
+func looksLikeInlineMath(inner string) bool {
+	if inner == "" || strings.TrimSpace(inner) != inner ||
+		strings.ContainsAny(inner, "$\r\n") {
+		return false
+	}
+	if strings.ContainsAny(inner, `\^_={}[]()`) {
+		return true
+	}
+	hasLetter := false
+	for _, r := range inner {
+		switch {
+		case unicode.IsLetter(r):
+			hasLetter = true
+		case unicode.IsDigit(r), r == '_', r == '.', r == ',':
+		case strings.ContainsRune("+-*/<>", r):
+		default:
+			return false
+		}
+	}
+	return hasLetter
+}
+
+// rewriteInlineMath converts $...$ in HTML text nodes, skipping code blocks.
+func rewriteInlineMath(body *golanghtml.Node) {
+	walk(body, func(n *golanghtml.Node) {
+		if n.Type != golanghtml.TextNode || hasAncestor(n, "pre", "code", "script", "style", "textarea") {
+			return
+		}
+		n.Data = convertInlineMath(n.Data)
+	})
+}
+
+func hasAncestor(n *golanghtml.Node, tags ...string) bool {
+	for parent := n.Parent; parent != nil; parent = parent.Parent {
+		for _, tag := range tags {
+			if parent.Data == tag {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func convertInlineMath(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); {
+		if s[i] == '\\' && i+1 < len(s) && s[i+1] == '$' {
+			b.WriteByte('$')
+			i += 2
+			continue
+		}
+		if s[i] != '$' {
+			b.WriteByte(s[i])
+			i++
+			continue
+		}
+		if i+1 < len(s) && s[i+1] == '$' {
+			b.WriteString("$$")
+			i += 2
+			continue
+		}
+		j := i + 1
+		for j < len(s) {
+			if s[j] == '\\' {
+				j += 2
+				continue
+			}
+			if s[j] == '$' {
+				if j+1 < len(s) && s[j+1] == '$' {
+					j += 2
+					continue
+				}
+				break
+			}
+			j++
+		}
+		if j < len(s) && looksLikeInlineMath(s[i+1:j]) {
+			b.WriteString(`\(`)
+			b.WriteString(s[i+1 : j])
+			b.WriteString(`\)`)
+			i = j + 1
+			continue
+		}
+		b.WriteByte('$')
+		i++
+	}
+	return b.String()
 }
 
 // normalizeContent cleans legacy Typecho HTML and builds a TOC.
-func normalizeContent(source string) (string, []TOCItem) {
+func normalizeContent(source string, inlineMath bool) (string, []TOCItem) {
 	doc, err := golanghtml.Parse(strings.NewReader(source))
 	if err != nil {
 		return source, nil
@@ -120,6 +277,9 @@ func normalizeContent(source string) (string, []TOCItem) {
 
 	removeArtifacts(body)
 	wrapTables(body)
+	if inlineMath {
+		rewriteInlineMath(body)
+	}
 
 	var buf bytes.Buffer
 	for child := body.FirstChild; child != nil; child = child.NextSibling {

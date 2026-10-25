@@ -16,7 +16,7 @@ const postColumnTemplate = `
 	p.author_id, COALESCE(NULLIF(u.screen_name, ''), NULLIF(u.username, ''),
 		(SELECT value FROM options WHERE name = 'site.author'), '') AS author,
 	p.post_password, p.allow_comment, p.pinned, p.views, p.likes,
-	p.format, p.template, p.source, p.source_id,
+	p.format, p.template, p.math, p.source, p.source_id,
 	p.published_at, p.created_at, p.updated_at`
 
 type scanner interface {
@@ -29,13 +29,14 @@ func scanPost(s scanner, withContent bool) (*model.Post, error) {
 		authorID     sql.NullInt64
 		allowComment int
 		pinned       int
+		math         int
 		publishedAt  sql.NullTime
 	)
 	if err := s.Scan(
 		&p.ID, &p.Slug, &p.Title, &p.Content, &p.Excerpt, &p.Cover,
 		&p.Type, &p.Status, &authorID, &p.Author, &p.PostPassword,
 		&allowComment, &pinned, &p.Views, &p.Likes,
-		&p.Format, &p.Template, &p.Source, &p.SourceID,
+		&p.Format, &p.Template, &math, &p.Source, &p.SourceID,
 		&publishedAt, &p.CreatedAt, &p.UpdatedAt,
 	); err != nil {
 		return nil, err
@@ -47,6 +48,7 @@ func scanPost(s scanner, withContent bool) (*model.Post, error) {
 	}
 	p.AllowComment = allowComment != 0
 	p.Pinned = pinned != 0
+	p.Math = math != 0
 	if publishedAt.Valid {
 		t := publishedAt.Time
 		p.PublishedAt = &t
@@ -327,11 +329,11 @@ func (s *SQLiteStore) createPost(p *model.Post) error {
 	res, err := s.db.Exec(
 		`INSERT INTO posts
 			(slug, title, content, excerpt, cover, type, status, format, template,
-			 source, source_id, author_id, post_password, allow_comment, pinned,
+			 math, source, source_id, author_id, post_password, allow_comment, pinned,
 			 views, likes, published_at, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		p.Slug, p.Title, p.Content, p.Excerpt, p.Cover, p.Type, p.Status,
-		p.Format, p.Template, p.Source, p.SourceID, p.AuthorID,
+		p.Format, p.Template, boolInt(p.Math), p.Source, p.SourceID, p.AuthorID,
 		p.PostPassword, boolInt(p.AllowComment), boolInt(p.Pinned), p.Views, p.Likes,
 		p.PublishedAt, p.CreatedAt, p.UpdatedAt,
 	)
@@ -392,7 +394,7 @@ func (s *SQLiteStore) updatePost(slug string, p *model.Post) error {
 	_, err := s.db.Exec(
 		`UPDATE posts SET
 			title = ?, content = ?, excerpt = ?, cover = ?, type = ?, status = ?,
-			format = ?, template = ?,
+			format = ?, template = ?, math = ?,
 			author_id = ?, post_password = ?, allow_comment = ?, pinned = ?,
 			published_at = CASE
 				WHEN ? IS NOT NULL THEN ?
@@ -401,7 +403,7 @@ func (s *SQLiteStore) updatePost(slug string, p *model.Post) error {
 			updated_at = ?
 		 WHERE id = ?`,
 		p.Title, p.Content, p.Excerpt, p.Cover, p.Type, p.Status,
-		p.Format, p.Template,
+		p.Format, p.Template, boolInt(p.Math),
 		p.AuthorID, p.PostPassword, boolInt(p.AllowComment), boolInt(p.Pinned),
 		p.PublishedAt, p.PublishedAt, p.Status, time.Now(),
 		p.UpdatedAt, id,

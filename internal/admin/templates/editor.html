@@ -70,6 +70,11 @@
           </select>
           <div class="muted">从 Typecho 导入的旧文章多为 HTML，请保持 HTML 格式。</div>
         </div>
+        <label class="check">
+          <input type="checkbox" name="math" value="1" {{if .Post.Math}}checked{{end}}>
+          启用行内 $ 公式
+        </label>
+        <div class="muted" style="margin-bottom:12px">仅数学文章开启；PHP/shell 文章保持关闭，避免 $变量 被当成公式。</div>
         <div class="field">
           <label for="published_at">发布时间</label>
           <input id="published_at" type="datetime-local" name="published_at" value="{{datetimeLocal .Post.PublishedAt}}">
@@ -146,6 +151,9 @@
       const body = new URLSearchParams();
       body.set('_csrf', {{.CSRF}});
       body.set('content', textarea.value);
+      body.set('format', document.getElementById('format').value);
+      const math = document.querySelector('input[name="math"]');
+      body.set('math', math && math.checked ? '1' : '');
       const res = await fetch('/admin/preview', {
         method: 'POST',
         credentials: 'same-origin',

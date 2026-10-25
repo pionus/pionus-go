@@ -73,6 +73,99 @@ func TestRenderLegacyHTML(t *testing.T) {
 	}
 }
 
+func TestInlineMathRequiresOptIn(t *testing.T) {
+	php := &model.Post{
+		Format:  model.FormatMarkdown,
+		Content: "PHP uses $name and $_REQUEST.",
+	}
+	if got := RenderPost(php); got.HasMath || got.InlineMath {
+		t.Fatalf("PHP dollars enabled math: %+v", got)
+	}
+
+	math := &model.Post{
+		Format:  model.FormatMarkdown,
+		Content: "Inline $x^2$ and cost $5.",
+		Math:    true,
+	}
+	got := RenderPost(math)
+	if !got.HasMath || !got.InlineMath {
+		t.Fatalf("opted-in inline math not detected: %+v", got)
+	}
+	if !strings.Contains(string(got.HTML), `\(x^2\)`) || strings.Contains(string(got.HTML), "$x^2$") {
+		t.Fatalf("inline math was not converted: %s", got.HTML)
+	}
+
+	display := &model.Post{
+		Format:  model.FormatMarkdown,
+		Content: "Display $$x^2$$ only.",
+	}
+	got = RenderPost(display)
+	if !got.HasMath || got.InlineMath {
+		t.Fatalf("display math should not enable inline delimiters: %+v", got)
+	}
+}
+
+func TestInlineMathIgnoresEscapedAndDoubleDollars(t *testing.T) {
+	p := &model.Post{
+		Format:  model.FormatMarkdown,
+		Content: `Escaped \$5 and a lone $sign.`,
+		Math:    true,
+	}
+	if got := RenderPost(p); got.HasMath {
+		t.Fatal("escaped/unpaired dollars should not count as inline math")
+	}
+}
+
+func TestInlineMathProtectsMarkdownSyntax(t *testing.T) {
+	p := &model.Post{
+		Format:  model.FormatMarkdown,
+		Content: "Price $5 and $10. Formula $a_i + b^2$.",
+		Math:    true,
+	}
+	got := RenderPost(p)
+	html := string(got.HTML)
+	if !strings.Contains(html, "Price $5 and $10") {
+		t.Fatalf("currency was consumed: %s", html)
+	}
+	if !strings.Contains(html, `\(a_i + b^2\)`) {
+		t.Fatalf("formula was not converted: %s", html)
+	}
+	if strings.Contains(html, "<em>") {
+		t.Fatalf("formula was parsed as Markdown emphasis: %s", html)
+	}
+}
+
+func TestInlineMathWithoutFormulaDoesNotLoadKatex(t *testing.T) {
+	p := &model.Post{
+		Format:  model.FormatMarkdown,
+		Content: "Price $5 and $10.",
+		Math:    true,
+	}
+	got := RenderPost(p)
+	if got.HasMath || got.InlineMath {
+		t.Fatalf("currency enabled math: %+v", got)
+	}
+	if !strings.Contains(string(got.HTML), "$5 and $10") {
+		t.Fatalf("currency was changed: %s", got.HTML)
+	}
+}
+
+func TestInlineMathInHTMLContent(t *testing.T) {
+	p := &model.Post{
+		Format:  model.FormatHTML,
+		Content: "<p>Formula $x^2$ and code <code>$not$</code>.</p>",
+		Math:    true,
+	}
+	got := RenderPost(p)
+	html := string(got.HTML)
+	if !strings.Contains(html, `\(x^2\)`) {
+		t.Fatalf("HTML inline math was not converted: %s", html)
+	}
+	if !strings.Contains(html, "<code>$not$</code>") {
+		t.Fatalf("code span was modified: %s", html)
+	}
+}
+
 func TestRenderHTMLHeadingIDsUnique(t *testing.T) {
 	p := &model.Post{
 		Format:  model.FormatHTML,

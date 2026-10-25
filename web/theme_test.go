@@ -96,8 +96,7 @@ func TestArchiveTemplate(t *testing.T) {
 	}
 }
 
-func TestPostTemplate(t *testing.T) {
-	post := samplePost()
+func postTemplateData(post *model.Post) map[string]any {
 	rendered := content.RenderPost(post)
 	data := siteData(post.Title)
 	data["Post"] = post
@@ -122,12 +121,32 @@ func TestPostTemplate(t *testing.T) {
 		Started int64
 	}{Started: time.Now().Unix()}
 	data["IsPage"] = false
+	return data
+}
 
+func TestPostTemplate(t *testing.T) {
+	data := postTemplateData(samplePost())
 	out := renderTemplate(t, "post.html", data)
 	for _, want := range []string{"Hello World", "本文目录", "写下你的评论", `name="_csrf"`} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("post output missing %q", want)
 		}
+	}
+}
+
+func TestPostTemplateInlineMath(t *testing.T) {
+	post := samplePost()
+	post.Math = true
+	post.Content = "Inline $x^2$."
+	out := renderTemplate(t, "post.html", postTemplateData(post))
+	if !strings.Contains(out, "katex.min.js") {
+		t.Fatal("KaTeX was not loaded for inline math")
+	}
+	if strings.Contains(out, "{left: '$', right: '$'") {
+		t.Fatal("client-side dollar delimiter should not be enabled")
+	}
+	if !strings.Contains(out, `\(x^2\)`) {
+		t.Fatal("inline math was not converted to an explicit delimiter")
 	}
 }
 

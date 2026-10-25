@@ -27,6 +27,7 @@ type PostInput struct {
 	Type         string     `json:"type"`
 	Status       string     `json:"status"`
 	Format       string     `json:"format"`
+	Math         *bool      `json:"math"`
 	Template     string     `json:"template"`
 	AuthorID     *int64     `json:"author_id"`
 	Password     string     `json:"password"`
@@ -68,6 +69,7 @@ func (in *PostInput) Build(existing *model.Post) (*model.Post, error) {
 		Type:         in.Type,
 		Status:       in.Status,
 		Format:       in.Format,
+		Math:         in.Math != nil && *in.Math,
 		Template:     in.Template,
 		AuthorID:     in.AuthorID,
 		PostPassword: in.Password,
@@ -84,6 +86,7 @@ func (in *PostInput) Build(existing *model.Post) (*model.Post, error) {
 		p.PublishedAt = existing.PublishedAt
 		p.AllowComment = existing.AllowComment
 		p.Pinned = existing.Pinned
+		p.Math = existing.Math
 		if p.Type == "" {
 			p.Type = existing.Type
 		}
@@ -131,6 +134,9 @@ func (in *PostInput) Build(existing *model.Post) (*model.Post, error) {
 	}
 	if in.Pinned != nil {
 		p.Pinned = *in.Pinned
+	}
+	if in.Math != nil {
+		p.Math = *in.Math
 	}
 
 	if in.PublishedAt != nil {

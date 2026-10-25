@@ -39,6 +39,10 @@ type Post struct {
 	Status  string `json:"status"`
 	// Format is "markdown" or "html". Imported Typecho posts may be raw HTML.
 	Format string `json:"format"`
+	// Math enables inline $...$ KaTeX delimiters. Display math ($$...$$,
+	// \[...\]) is always enabled; this flag is opt-in because historical PHP
+	// and shell posts use dollar signs as variables.
+	Math bool `json:"math"`
 	// Template is the legacy Typecho page template name, kept for reference.
 	Template string `json:"template,omitempty"`
 	AuthorID *int64 `json:"author_id,omitempty"`

@@ -185,10 +185,18 @@ func (a *Admin) postDelete(ctx arry.Context) {
 }
 
 func (a *Admin) preview(ctx arry.Context) {
-	html := content.RenderMarkdown(ctx.Request().PostFormValue("content"))
+	p := &model.Post{
+		Content: ctx.Request().PostFormValue("content"),
+		Format:  ctx.Request().PostFormValue("format"),
+		Math:    ctx.Request().PostFormValue("math") != "",
+	}
+	if p.Format == "" {
+		p.Format = model.FormatMarkdown
+	}
+	rendered := content.RenderPost(p)
 	ctx.SetContentType("text/html; charset=utf-8")
 	ctx.Status(http.StatusOK)
-	ctx.Response().Write([]byte(html))
+	ctx.Response().Write([]byte(rendered.HTML))
 }
 
 func (a *Admin) renderEditor(ctx arry.Context, code int, p *model.Post, isNew bool, errMsg string, selectedCatIDs []int64, tagsValue string) {
@@ -237,8 +245,10 @@ func (a *Admin) postInputFromForm(r *http.Request) (*content.PostInput, error) {
 
 	allow := r.PostFormValue("allow_comment") != ""
 	pinned := r.PostFormValue("pinned") != ""
+	math := r.PostFormValue("math") != ""
 	in.AllowComment = &allow
 	in.Pinned = &pinned
+	in.Math = &math
 
 	if raw := strings.TrimSpace(r.PostFormValue("published_at")); raw != "" {
 		t, err := time.ParseInLocation("2006-01-02T15:04", raw, time.Local)
@@ -285,6 +295,9 @@ func postFromInput(in *content.PostInput) *model.Post {
 		Format:      in.Format,
 		Template:    in.Template,
 		PublishedAt: in.PublishedAt,
+	}
+	if in.Math != nil {
+		p.Math = *in.Math
 	}
 	if in.AllowComment != nil {
 		p.AllowComment = *in.AllowComment

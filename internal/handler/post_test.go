@@ -183,7 +183,7 @@ func TestUpdatePostKeepsUnspecifiedFields(t *testing.T) {
 	app, _ := newTestHandlers(t)
 
 	rec := doRequest(t, app, http.MethodPost, "/api/posts", "secret",
-		`{"title":"Original","content":"body","slug":"keep","pinned":true}`)
+		`{"title":"Original","content":"body","slug":"keep","pinned":true,"math":true}`)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create status = %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -206,6 +206,9 @@ func TestUpdatePostKeepsUnspecifiedFields(t *testing.T) {
 	}
 	if !updated.AllowComment {
 		t.Fatal("allow_comment should be preserved when omitted")
+	}
+	if !updated.Math {
+		t.Fatal("math should be preserved when omitted")
 	}
 }
 

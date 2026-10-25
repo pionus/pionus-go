@@ -12,6 +12,7 @@ type renderKey struct {
 	id     int64
 	format string
 	hash   uint64
+	math   bool
 }
 
 var (
@@ -28,7 +29,7 @@ func RenderPostCached(p *model.Post) RenderedPost {
 
 	h := fnv.New64a()
 	h.Write([]byte(p.Content))
-	key := renderKey{id: p.ID, format: p.Format, hash: h.Sum64()}
+	key := renderKey{id: p.ID, format: p.Format, hash: h.Sum64(), math: p.Math}
 
 	if value, ok := renderCache.Load(key); ok {
 		return value.(RenderedPost)

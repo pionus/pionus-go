@@ -143,6 +143,7 @@ func TestPostLifecycle(t *testing.T) {
 		Content:     "# Heading\n\nThis is **markdown** content.",
 		Type:        model.PostTypePost,
 		Status:      model.StatusPublish,
+		Math:        true,
 		PublishedAt: &at,
 		CategoryIDs: []int64{cat.ID},
 		TagIDs:      []int64{tag.ID},
@@ -154,6 +155,9 @@ func TestPostLifecycle(t *testing.T) {
 	}
 	if got.Excerpt == "" {
 		t.Fatal("excerpt was not generated")
+	}
+	if !got.Math {
+		t.Fatal("math flag was not persisted")
 	}
 	if len(got.Categories) != 1 || got.Categories[0].Slug != "go" {
 		t.Fatalf("categories = %+v", got.Categories)
@@ -199,6 +203,7 @@ func TestPostLifecycle(t *testing.T) {
 	// Update: rename, tag removal and a draft status.
 	got.Title = "Hello Again"
 	got.Status = model.StatusDraft
+	got.Math = false
 	got.TagIDs = []int64{}
 	if err := s.UpdatePost(p.Slug, got); err != nil {
 		t.Fatal(err)
@@ -210,6 +215,9 @@ func TestPostLifecycle(t *testing.T) {
 	}
 	if updated.Title != "Hello Again" || updated.Status != model.StatusDraft {
 		t.Fatalf("update did not apply: %+v", updated)
+	}
+	if updated.Math {
+		t.Fatal("math flag was not cleared")
 	}
 	if len(updated.Tags) != 0 {
 		t.Fatalf("tags not cleared: %+v", updated.Tags)

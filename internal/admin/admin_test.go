@@ -239,6 +239,7 @@ func TestCreateEditAndDeletePost(t *testing.T) {
 		"content":       {"# 标题\n\n正文"},
 		"status":        {"publish"},
 		"type":          {"post"},
+		"math":          {"1"},
 		"allow_comment": {"1"},
 		"tags":          {"Go, 测试"},
 	})
@@ -251,7 +252,7 @@ func TestCreateEditAndDeletePost(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if post.Title != "第一篇" || post.Status != model.StatusPublish {
+	if post.Title != "第一篇" || post.Status != model.StatusPublish || !post.Math {
 		t.Fatalf("post = %+v", post)
 	}
 	if len(post.Tags) != 2 {
@@ -270,6 +271,7 @@ func TestCreateEditAndDeletePost(t *testing.T) {
 		"content":       {"新正文"},
 		"status":        {"draft"},
 		"type":          {"post"},
+		"math":          {"1"},
 		"allow_comment": {"1"},
 		"tags":          {"Go"},
 	})
@@ -290,6 +292,32 @@ func TestCreateEditAndDeletePost(t *testing.T) {
 	resp.Body.Close()
 	if _, err := e.store.GetPost("first"); err == nil {
 		t.Fatal("post was not deleted")
+	}
+}
+
+func TestAdminPreviewInlineMath(t *testing.T) {
+	e := newTestEnv(t)
+	e.setup(t)
+
+	resp := e.postForm(t, "/admin/preview", url.Values{
+		"content": {"Inline $x^2$."},
+		"format":  {model.FormatMarkdown},
+		"math":    {"1"},
+	})
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), `\(x^2\)`) {
+		t.Fatalf("preview status=%d body=%s", resp.StatusCode, body)
+	}
+
+	resp = e.postForm(t, "/admin/preview", url.Values{
+		"content": {"PHP $x^2$."},
+		"format":  {model.FormatMarkdown},
+	})
+	body, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if strings.Contains(string(body), `\(x^2\)`) {
+		t.Fatalf("preview enabled math without opt-in: %s", body)
 	}
 }
 

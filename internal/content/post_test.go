@@ -81,6 +81,36 @@ func TestBuildUpdateKeepsFields(t *testing.T) {
 	}
 }
 
+func TestBuildMathFlag(t *testing.T) {
+	yes := true
+	no := false
+
+	p, err := (&PostInput{Title: "T", Content: "C", Math: &yes}).Build(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.Math {
+		t.Fatal("new post math flag was not applied")
+	}
+
+	existing := &model.Post{Slug: "p", Title: "P", Content: "C", Math: true}
+	kept, err := (&PostInput{Title: "P", Content: "C"}).Build(existing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !kept.Math {
+		t.Fatal("update should preserve math when omitted")
+	}
+
+	cleared, err := (&PostInput{Title: "P", Content: "C", Math: &no}).Build(existing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleared.Math {
+		t.Fatal("update should clear math when false")
+	}
+}
+
 func TestBuildUpdateCanClearTaxonomy(t *testing.T) {
 	existing := &model.Post{Slug: "p", Title: "P", Content: "c", Status: model.StatusDraft}
 
