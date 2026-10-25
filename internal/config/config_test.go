@@ -29,6 +29,7 @@ session:
 	t.Setenv("PIONUS_ADDR", "127.0.0.1:9999")
 	t.Setenv("PIONUS_SECRET", "secret")
 	t.Setenv("PIONUS_ACCESS_LOG", "-")
+	t.Setenv("PIONUS_THEME", "/themes/test")
 
 	cfg, err := Load(path)
 	if err != nil {
@@ -39,6 +40,9 @@ session:
 	}
 	if cfg.Upload.MaxSizeMB != 3 || cfg.Session.TTLHours != 2 || cfg.Timezone != "UTC" {
 		t.Fatalf("config = %+v", cfg)
+	}
+	if cfg.Theme != "/themes/test" {
+		t.Fatalf("theme = %q", cfg.Theme)
 	}
 }
 

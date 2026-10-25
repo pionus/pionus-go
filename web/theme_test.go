@@ -3,6 +3,9 @@ package web
 import (
 	"bytes"
 	"html/template"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -195,4 +198,51 @@ func TestTaxonomyAnd404Templates(t *testing.T) {
 	data = siteData("页面没找到")
 	data["Message"] = "页面不存在"
 	renderTemplate(t, "404.html", data)
+}
+
+func TestExternalThemeOverlaysEmbedded(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "pages"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "assets"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "pages", "home.html"), []byte(`{{define "home.html"}}CUSTOM HOME{{end}}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "assets", "custom.css"), []byte("body{color:red}"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	engine, err := NewEngineWithTheme(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	if err := engine.Render(&buf, "home.html", map[string]any{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(buf.String()); got != "CUSTOM HOME" {
+		t.Fatalf("home = %q", got)
+	}
+
+	templates, assets, err := ThemeFilesystems(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fs.Stat(templates, "pages/post.html"); err != nil {
+		t.Fatalf("embedded template fallback missing: %v", err)
+	}
+	data, err := fs.ReadFile(assets, "custom.css")
+	if err != nil || string(data) != "body{color:red}" {
+		t.Fatalf("custom asset = %q, err=%v", data, err)
+	}
+	if _, err := fs.Stat(assets, "main.css"); err != nil {
+		t.Fatalf("embedded asset fallback missing: %v", err)
+	}
+
+	if _, _, err := ThemeFilesystems(filepath.Join(dir, "missing")); err == nil {
+		t.Fatal("expected missing theme directory error")
+	}
 }

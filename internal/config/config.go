@@ -124,6 +124,9 @@ func Load(path string) (*Config, error) {
 	if v := os.Getenv("PIONUS_SESSION_SECURE"); v != "" {
 		cfg.Session.Secure = v == "1" || v == "true" || v == "yes"
 	}
+	if v := os.Getenv("PIONUS_THEME"); v != "" {
+		cfg.Theme = v
+	}
 	if v := os.Getenv("PIONUS_PLUGINS_ENABLED"); v != "" {
 		cfg.Plugins.Enabled = cfg.Plugins.Enabled[:0]
 		for _, part := range strings.Split(v, ",") {

@@ -6,11 +6,16 @@ server:
 
 timezone: "Asia/Shanghai"
 
+# Optional external theme directory. Empty uses the embedded Paper & Ink theme.
+# Missing templates/assets fall back to the embedded theme.
+theme: ""
+
 security:
   secret: ""
 
 # Compile-time plugins. Built-in plugins are registered in plugins/plugins.go.
 plugins:
+  # Built-ins: eventlog, typecho-redirects.
   enabled: []
   # config: {}
 

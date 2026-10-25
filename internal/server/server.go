@@ -88,9 +88,16 @@ func New(cfg *config.Config, db store.Store) (*App, error) {
 	}))
 	app.Use(session.Middleware())
 
-	app.StaticFSWithConfig("/assets", web.AssetsFS(), arry.StaticConfig{MaxAge: time.Hour})
+	themeTemplates, themeAssets, err := web.ThemeFilesystems(cfg.Theme)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Theme != "" {
+		slog.Info("using external theme", "dir", cfg.Theme)
+	}
+	app.StaticFSWithConfig("/assets", themeAssets, arry.StaticConfig{MaxAge: time.Hour})
 	app.StaticWithConfig("/uploads", arry.StaticConfig{Dir: cfg.Upload.Dir, MaxAge: 24 * time.Hour})
-	app.ViewsWithConfig(web.EngineConfig())
+	app.ViewsWithConfig(web.EngineConfigWithFS(themeTemplates))
 
 	pluginManager, err := plugin.NewManager(plugins.Factories(), cfg.Plugins, plugin.Env{
 		Config: cfg,
