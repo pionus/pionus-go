@@ -18,7 +18,10 @@ plugins:
   enabled: [eventlog]
 ```
 
-`plugins/eventlog` is a small reference implementation.
+Built-in plugins:
+
+- `eventlog`: logs domain events for diagnostics
+- `typecho-redirects`: optional 301 redirects for legacy Typecho URLs
 
 ## Contract
 
@@ -189,3 +192,4 @@ Startup rules:
 - no persistent event queue; a webhook plugin must provide its own
 
 The recommended next extension is a webhook plugin built on this event model.
+See [Typecho migration](typecho-migration.md) for the redirect plugin.

@@ -13,6 +13,7 @@ package plugins
 import (
 	"github.com/pionus/pionus-go/internal/plugin"
 	"github.com/pionus/pionus-go/plugins/eventlog"
+	"github.com/pionus/pionus-go/plugins/typechoredirects"
 )
 
 // Factories returns the built-in plugin factories. The list is intentionally
@@ -20,5 +21,6 @@ import (
 func Factories() []plugin.Factory {
 	return []plugin.Factory{
 		eventlog.New,
+		typechoredirects.New,
 	}
 }
