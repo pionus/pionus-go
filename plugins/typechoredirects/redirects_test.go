@@ -41,6 +41,12 @@ func newRedirectApp(t *testing.T) *arry.Arry {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	if err := db.CreatePost(&model.Post{
+		Slug: "draft-share", Title: "Draft Share", Content: "body",
+		Status: model.StatusDraft, Source: "typecho", SourceID: "99",
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	app := arry.New()
 	p := New().(*Plugin)
@@ -91,5 +97,12 @@ func TestTypechoRedirects(t *testing.T) {
 	app.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK || rec.Body.String() != "ok" {
 		t.Fatalf("new URL = %d %q", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/archives/99", nil)
+	rec = httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("draft legacy URL = %d, want 200 fallback (no redirect)", rec.Code)
 	}
 }

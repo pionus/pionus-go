@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/pionus/arry"
 	"github.com/pionus/pionus-go/internal/model"
@@ -32,7 +33,7 @@ func (p *Plugin) Manifest() plugin.Manifest {
 	return plugin.Manifest{
 		ID:          "typecho-redirects",
 		Name:        "Typecho URL redirects",
-		Version:     "1.0.0",
+		Version:     "1.0.1",
 		APIVersion:  plugin.APIVersion,
 		Description: "301 redirects common Typecho permalinks, feeds and uploads.",
 	}
@@ -76,7 +77,7 @@ func buildRoutes(db store.Store) (map[string]string, error) {
 			return nil, fmt.Errorf("list posts for redirects: %w", err)
 		}
 		for _, post := range posts {
-			if post.Source != "typecho" || post.SourceID == "" {
+			if post.Source != "typecho" || post.SourceID == "" || !post.PubliclyVisible(time.Now()) {
 				continue
 			}
 			target := "/article/" + post.Slug
