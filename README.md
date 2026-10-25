@@ -21,6 +21,8 @@ redirected with the optional `typecho-redirects` plugin.
 - SQLite FTS5 trigram search, render caching and self-hosted code highlighting
 - Password-protected posts and tags, signed draft preview links, admin password
   change and user roles
+- Versioned multi-arch images published to GHCR with `latest` tracking the
+  newest stable release
 - Deployment manifests, backup script and CI
 - Trusted-proxy aware client IPs for rate limiting
 - Compile-time plugins with lifecycle hooks and a typed post/comment/note
@@ -123,6 +125,7 @@ Migration, hidden tags, external themes and plugin extension points are
 documented in:
 
 - [Install](docs/install.md)
+- [Releases and images](docs/release.md)
 - [Typecho migration](docs/typecho-migration.md)
 - [Hidden tags](docs/tag-protection.md)
 - [External themes](docs/themes.md)

@@ -29,14 +29,16 @@ spec:
       labels:
         app: pionus
     spec:
+      imagePullSecrets:
+        - name: ghcr-secrets
       securityContext:
         runAsUser: 10001
         runAsGroup: 10001
         fsGroup: 10001
       containers:
         - name: pionus
-          image: ghcr.io/secbone/pionus:latest
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/pionus/pionus-go:latest
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 8087

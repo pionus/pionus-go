@@ -1,8 +1,9 @@
 services:
   pionus:
-    image: ghcr.io/secbone/pionus:latest
+    image: ghcr.io/pionus/pionus-go:latest
     container_name: pionus
     restart: unless-stopped
+    pull_policy: always
     ports:
       - "8087:8087"
     environment:

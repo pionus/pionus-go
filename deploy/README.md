@@ -3,8 +3,8 @@
 ## Build and push
 
 ```bash
-docker build -t ghcr.io/secbone/pionus:latest .
-docker push ghcr.io/secbone/pionus:latest
+docker build -t ghcr.io/pionus/pionus-go:local .
+docker push ghcr.io/pionus/pionus-go:local
 ```
 
 ## Kubernetes (existing `lnmp` namespace)
@@ -22,6 +22,9 @@ kubectl -n lnmp rollout status deploy/pionus
 
 The deployment uses one replica and a `Recreate` strategy: SQLite and the
 uploads directory live on one PVC and must not be mounted by multiple writers.
+It pulls `ghcr.io/pionus/pionus-go:latest` with `imagePullPolicy: Always`, so
+tagged releases become available after a rollout. If the GHCR package is
+private, the `ghcr-secrets` image pull secret must contain a valid token.
 
 ## Caddy
 
